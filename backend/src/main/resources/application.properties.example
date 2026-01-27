@@ -1,0 +1,74 @@
+# ================================
+# DATABASE CONFIGURATION
+# ================================
+# PostgreSQL database connection settings
+# Make sure PostgreSQL is installed and running on your machine
+spring.datasource.url=jdbc:postgresql://localhost:5432/jobnest_v2
+spring.datasource.username=postgres
+spring.datasource.password=YOUR_POSTGRES_PASSWORD
+
+# ================================
+# JPA / HIBERNATE CONFIGURATION
+# ================================
+# Auto-create/update database tables based on entities
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+
+# ================================
+# SQL LOGGING
+# ================================
+# Show SQL queries in console for debugging
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql=TRACE
+
+# ================================
+# JWT CONFIGURATION
+# ================================
+# Secret key for JWT token signing (minimum 256 bits for HS256)
+# IMPORTANT: Change this to a unique secret in production!
+jwt.secret=jobnest-super-secret-key-that-should-be-at-least-256-bits-long-for-hs256-algorithm-security
+# Access token expiration: 900000ms = 15 minutes
+jwt.access-token-expiration=900000
+# Refresh token expiration: 604800000ms = 7 days
+jwt.refresh-token-expiration=604800000
+
+# ================================
+# EMAIL CONFIGURATION (Gmail SMTP)
+# ================================
+# To use Gmail for sending emails, you need:
+# 1. Enable 2-Step Verification: https://myaccount.google.com/security
+# 2. Generate App Password: https://myaccount.google.com/apppasswords
+#    - Select "Mail" and "Other" (type "JobNest Backend")
+#    - Copy the 16-character password (remove spaces)
+# 3. Replace YOUR_EMAIL@gmail.com and YOUR_APP_PASSWORD below
+
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=YOUR_EMAIL@gmail.com
+spring.mail.password=YOUR_16_CHAR_APP_PASSWORD
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
+spring.mail.properties.mail.smtp.connectiontimeout=5000
+spring.mail.properties.mail.smtp.timeout=5000
+spring.mail.properties.mail.smtp.writetimeout=5000
+
+# ================================
+# APPLICATION URL
+# ================================
+# Frontend URL for email verification links
+# Change to production URL when deploying
+app.url=http://localhost:3000
+
+# ================================
+# SETUP INSTRUCTIONS
+# ================================
+# 1. Copy this file and rename it to: application.properties
+# 2. Install PostgreSQL and create database: CREATE DATABASE jobnest_v2;
+# 3. Update spring.datasource.password with your PostgreSQL password
+# 4. Get Gmail App Password (see Email Configuration section above)
+# 5. Update spring.mail.username and spring.mail.password
+# 6. Run the backend: cd backend && .\mvnw.cmd spring-boot:run
+# 7. Backend will start on: http://localhost:8080
