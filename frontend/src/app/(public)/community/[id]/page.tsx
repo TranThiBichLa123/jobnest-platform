@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { postApi } from "@/lib/communitypostApi";
-import { Post } from "@/types/communitypost";
+import { postApi } from "@/shared/api/communitypost";
+import { Post } from "@/shared/types/communitypost";
 
 export default function PostDetail({ params }: any) {
   const [post, setPost] = useState<Post | null>(null);

@@ -6,12 +6,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { BiBookmark, BiCircle, BiShareAlt, BiBriefcase, BiTime, BiMoney, BiMap } from "react-icons/bi";
 import { FaBookmark } from "react-icons/fa";
-import { AuthContext } from "@/context/AuthContext";
-import { useAuthModal } from "@/context/AuthModalContext";
-import { applicationApi, savedJobApi, jobViewApi } from "@/lib/api";
-import { server } from "@/lib/config";
-import useFetch from "@/hooks/useFetch";
-import { Job } from "@/types/job";
+import { AuthContext } from "@/features/auth/context/AuthContext";
+import { useAuthModal } from "@/features/auth/context/AuthModalContext";
+import { applicationApi, savedJobApi, jobViewApi } from "@/shared/api";
+import { server } from "@/config/env";
+import useFetch from "@/shared/hooks/useFetch";
+import { Job } from "@/shared/types/job";
 
 export default function JobDetailPage() {
   const params = useParams();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import ReactPaginate from "react-paginate";
 import {
   FiChevronsRight,
@@ -9,13 +9,13 @@ import {
   FiDelete,
 } from "react-icons/fi";
 import { BiFilterAlt } from "react-icons/bi";
-import Filters from "@/components/Home/Job/Filters";
-import JobList from "@/components/Home/Job/JobList";
-import { filters } from "@/data/jobFilters";
-import JobSearchBar from "@/components/Home/Hero/JobSearchBar";
+import Filters from "@/features/home/components/Job/Filters";
+import JobList from "@/features/home/components/Job/JobList";
+import { filters } from "@/shared/data/jobFilters";
+import JobSearchBar from "@/features/home/components/Hero/JobSearchBar";
 // SearchFilters might not exist in your project; we'll implement a small inline version below
-import useFetch from "@/hooks/useFetch";
-import { server } from "@/lib/config";
+import useFetch from "@/shared/hooks/useFetch";
+import { server } from "@/config/env";
 import { useSearchParams } from 'next/navigation';
 
 // Stable mock jobs used when the API returns an empty list. Kept at module scope
@@ -292,7 +292,7 @@ const getJobValueForFilter = (job: any, filterName: string) => {
   }
 };
 
-export default function JobsPage() {
+function JobsPageContent() {
   const { data: jobs = [], loading } = useFetch(`${server}/api/jobs?size=100`);
   const searchParams = useSearchParams();
 
@@ -698,3 +698,14 @@ export default function JobsPage() {
     </div>
   );
 }
+
+function JobsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <JobsPageContent />
+    </Suspense>
+  );
+}
+
+export default JobsPage;
+

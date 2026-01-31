@@ -1,1 +1,0 @@
-// for fetching jobs from backend

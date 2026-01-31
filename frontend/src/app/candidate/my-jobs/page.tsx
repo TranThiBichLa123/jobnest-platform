@@ -3,8 +3,8 @@
 import { useState, useContext, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AuthContext } from "@/context/AuthContext";
-import { applicationApi, savedJobApi, jobViewApi } from "@/lib/api";
+import { AuthContext } from "@/features/auth/context/AuthContext";
+import { applicationApi, savedJobApi, jobViewApi } from "@/shared/api";
 import { BiBriefcase, BiMoney, BiTime, BiTrash } from "react-icons/bi";
 import { BsBookmark, BsEye } from "react-icons/bs";
 import { GrLocation } from "react-icons/gr";
@@ -530,3 +530,5 @@ export default function MyJobsPage() {
     </div>
   );
 }
+
+

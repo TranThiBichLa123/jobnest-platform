@@ -2,17 +2,17 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import JobSkillTags from "@/components/Home/Job/JobSkillTags";
+import JobSkillTags from "@/features/home/components/Job/JobSkillTags";
 import { BiBookmark, BiCircle, BiShareAlt } from "react-icons/bi";
-import RelatedJobs from "@/components/Home/Job/RelatedJobs";
+import RelatedJobs from "@/features/home/components/Job/RelatedJobs";
 import { useSearchParams, useRouter } from "next/navigation";
-import useFetch from "@/hooks/useFetch";
-import { server } from "@/lib/config";
-import { useContext } from "react";
-import { AuthContext } from "@/context/AuthContext";
-import { useAuthModal } from "@/context/AuthModalContext";
+import useFetch from "@/shared/hooks/useFetch";
+import { server } from "@/config/env";
+import { useContext, Suspense } from "react";
+import { AuthContext } from "@/features/auth/context/AuthContext";
+import { useAuthModal } from "@/features/auth/context/AuthModalContext";
 
-const SingleJob = () => {
+const SingleJobContent = () => {
   const router = useRouter();
   const auth = useContext(AuthContext);
   const { openLoginModal } = useAuthModal();
@@ -167,4 +167,10 @@ const SingleJob = () => {
   );
 };
 
-export default SingleJob;
+export default function SingleJob() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SingleJobContent />
+    </Suspense>
+  );
+}
