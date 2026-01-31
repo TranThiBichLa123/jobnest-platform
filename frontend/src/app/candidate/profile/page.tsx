@@ -2,11 +2,11 @@
 
 import { useState, useContext, useEffect } from "react";
 import Image from "next/image";
-import { AuthContext } from "@/context/AuthContext";
+import { AuthContext } from "@/features/auth/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { candidateProfileApi, authApi } from "@/lib/api";
-import { CandidateProfile } from "@/types/profile";
-import CVManagement from "@/components/Candidate/CVManagement";
+import { candidateProfileApi, authApi } from "@/shared/api";
+import { CandidateProfile } from "@/shared/types/profile";
+import CVManagement from "@/features/candidate/components/CVManagement";
 
 export default function CandidateProfileForm() {
   const auth = useContext(AuthContext);
@@ -390,3 +390,5 @@ const TagInput = ({ label, placeholder, tags, setTags }: any) => {
     </div>
   );
 };
+
+

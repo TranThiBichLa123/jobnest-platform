@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { postApi } from "@/lib/communitypostApi";
-import PostCard from "@/components/Community/PostCard";
-import CreatePostModal from "@/components/Community/CreatePostModal";
-import Nav from "@/components/shared/Navbar/Nav";
+import { postApi } from "@/shared/api/communitypost";
+import PostCard from "@/features/community/components/PostCard";
+import CreatePostModal from "@/features/community/components/CreatePostModal";
+import Nav from "@/shared/components/Navbar/Nav";
 
 export default function CommunityPage() {
   const [posts, setPosts] = useState<any[]>([]);
@@ -108,3 +108,4 @@ export default function CommunityPage() {
     </div>
   );
 }
+

@@ -9,6 +9,17 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
+const featureNames = [
+  "applications",
+  "auth",
+  "candidate",
+  "community",
+  "company",
+  "home",
+  "jobs",
+  "notifications",
+];
+
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
@@ -20,6 +31,19 @@ const eslintConfig = [
       "next-env.d.ts",
     ],
   },
+  ...featureNames.map((feature) => ({
+    files: [`src/features/${feature}/**/*.{ts,tsx}`],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: featureNames
+            .filter((name) => name !== feature)
+            .map((name) => `@/features/${name}/**`),
+        },
+      ],
+    },
+  })),
 ];
 
 export default eslintConfig;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import api from "@/lib/axios";
+import api from "@/shared/api/http";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

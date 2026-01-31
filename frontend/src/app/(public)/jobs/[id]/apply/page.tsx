@@ -4,12 +4,12 @@ import { useState, useContext, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { BiUpload, BiCheckCircle } from "react-icons/bi";
-import { AuthContext } from "@/context/AuthContext";
-import { applicationApi, candidateProfileApi, cvApi } from "@/lib/api";
-import { server } from "@/lib/config";
-import useFetch from "@/hooks/useFetch";
-import { Job } from "@/types/job";
-import { CandidateCV } from "@/types/cv";
+import { AuthContext } from "@/features/auth/context/AuthContext";
+import { applicationApi, candidateProfileApi, cvApi } from "@/shared/api";
+import { server } from "@/config/env";
+import useFetch from "@/shared/hooks/useFetch";
+import { Job } from "@/shared/types/job";
+import { CandidateCV } from "@/shared/types/cv";
 
 // All countries in the world
 const countries = [
