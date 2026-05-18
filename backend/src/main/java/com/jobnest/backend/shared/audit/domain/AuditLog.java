@@ -8,7 +8,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 
 @Entity
 @Table(name = "audit_logs")

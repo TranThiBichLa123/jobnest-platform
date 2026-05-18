@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 
 @Entity
 @Table(name = "posts")

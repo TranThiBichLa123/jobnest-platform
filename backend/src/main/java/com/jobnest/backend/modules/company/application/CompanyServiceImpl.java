@@ -3,7 +3,7 @@ package com.jobnest.backend.modules.company.application;
 import com.jobnest.backend.modules.company.api.dto.CreateCompanyRequest;
 import com.jobnest.backend.modules.company.api.dto.CompanyResponse;
 import com.jobnest.backend.modules.company.domain.Company;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.company.infrastructure.CompanyRepository;
 
 import lombok.RequiredArgsConstructor;

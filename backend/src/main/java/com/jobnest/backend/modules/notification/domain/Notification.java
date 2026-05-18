@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.Where;
 
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 
 import java.time.LocalDateTime;
 

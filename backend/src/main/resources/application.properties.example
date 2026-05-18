@@ -10,8 +10,8 @@ spring.datasource.password=YOUR_POSTGRES_PASSWORD
 # ================================
 # JPA / HIBERNATE CONFIGURATION
 # ================================
-# Auto-create/update database tables based on entities
-spring.jpa.hibernate.ddl-auto=update
+# Validate database schema against entities
+spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.format_sql=true
 spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect

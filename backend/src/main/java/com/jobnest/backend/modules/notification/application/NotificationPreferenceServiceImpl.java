@@ -2,9 +2,9 @@ package com.jobnest.backend.modules.notification.application;
 
 import com.jobnest.backend.modules.notification.api.dto.NotificationPreferenceRequest;
 import com.jobnest.backend.modules.notification.api.dto.NotificationPreferenceResponse;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.notification.domain.NotificationPreference;
-import com.jobnest.backend.shared.repository.UserRepository;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 import com.jobnest.backend.modules.notification.infrastructure.NotificationPreferenceRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;

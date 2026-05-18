@@ -2,7 +2,7 @@ package com.jobnest.backend.modules.auth.api;
 
 import com.jobnest.backend.modules.auth.api.dto.request.*;
 import com.jobnest.backend.modules.auth.api.dto.response.*;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.integration.google.GoogleService;
 import com.jobnest.backend.modules.auth.application.AccountService;
 import com.jobnest.backend.modules.auth.application.JwtService;

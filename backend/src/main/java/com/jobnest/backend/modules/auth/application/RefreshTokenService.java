@@ -1,6 +1,6 @@
 package com.jobnest.backend.modules.auth.application;
 
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.auth.domain.RefreshToken;
 import com.jobnest.backend.modules.auth.infrastructure.RefreshTokenRepository;
 

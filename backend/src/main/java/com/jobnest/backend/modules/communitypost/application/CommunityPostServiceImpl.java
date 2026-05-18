@@ -2,10 +2,10 @@ package com.jobnest.backend.modules.communitypost.application;
 
 import com.jobnest.backend.modules.communitypost.api.dto.CommunityPostRequest;
 import com.jobnest.backend.modules.communitypost.api.dto.CommunityPostResponse;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.communitypost.domain.CommunityPost;
 import com.jobnest.backend.modules.communitypost.infrastructure.CommunityPostRepository;
-import com.jobnest.backend.shared.repository.UserRepository;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;

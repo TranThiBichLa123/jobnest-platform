@@ -1,8 +1,8 @@
 package com.jobnest.backend.shared.security.user;
 
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.candidate.domain.CandidateProfile;
-import com.jobnest.backend.shared.repository.UserRepository;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 import com.jobnest.backend.modules.candidate.infrastructure.CandidateProfileRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;

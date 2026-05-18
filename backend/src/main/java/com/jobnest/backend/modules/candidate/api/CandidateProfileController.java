@@ -2,8 +2,8 @@ package com.jobnest.backend.modules.candidate.api;
 
 import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileRequest;
 import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileResponse;
-import com.jobnest.backend.shared.domain.Account;
-import com.jobnest.backend.shared.repository.UserRepository;
+import com.jobnest.backend.modules.auth.domain.Account;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 import com.jobnest.backend.shared.security.user.CustomUserDetails;
 import com.jobnest.backend.modules.candidate.application.CandidateProfileService;
 

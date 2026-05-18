@@ -2,12 +2,12 @@ package com.jobnest.backend.modules.auth.application;
 
 import com.jobnest.backend.modules.auth.api.dto.request.*;
 import com.jobnest.backend.modules.auth.api.dto.response.*;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.auth.domain.EmailVerification;
 import com.jobnest.backend.modules.auth.domain.PasswordResetToken;
 import com.jobnest.backend.modules.auth.infrastructure.EmailVerificationRepository;
 import com.jobnest.backend.modules.auth.infrastructure.PasswordResetTokenRepository;
-import com.jobnest.backend.shared.repository.UserRepository;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 import com.jobnest.backend.integration.email.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;

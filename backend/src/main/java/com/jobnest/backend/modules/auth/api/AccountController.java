@@ -1,7 +1,7 @@
 package com.jobnest.backend.modules.auth.api;
 
 import com.jobnest.backend.modules.auth.api.dto.request.ChangePasswordRequest;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.shared.security.user.CustomUserDetails;
 import com.jobnest.backend.modules.auth.application.AccountService;
 

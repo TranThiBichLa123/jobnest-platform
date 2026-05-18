@@ -3,7 +3,7 @@ package com.jobnest.backend.modules.jobs.application;
 import com.jobnest.backend.modules.jobs.api.dto.response.JobResponse;
 import com.jobnest.backend.modules.jobs.domain.SavedJob;
 import com.jobnest.backend.modules.jobs.infrastructure.SavedJobRepository;
-import com.jobnest.backend.shared.repository.UserRepository;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 import com.jobnest.backend.modules.jobs.infrastructure.JobRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;

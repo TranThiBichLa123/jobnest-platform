@@ -1,7 +1,7 @@
 package com.jobnest.backend.modules.notification.application;
 
 import com.jobnest.backend.modules.notification.api.dto.NotificationResponse;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.jobs.domain.Job;
 import com.jobnest.backend.modules.notification.domain.Notification;
 import com.jobnest.backend.modules.applications.domain.Application;
@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.jobnest.backend.shared.repository.UserRepository;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 import com.jobnest.backend.modules.notification.infrastructure.NotificationRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;

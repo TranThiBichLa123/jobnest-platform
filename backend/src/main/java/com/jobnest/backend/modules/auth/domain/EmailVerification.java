@@ -3,7 +3,7 @@ package com.jobnest.backend.modules.auth.domain;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 
 @Entity
 @Table(name = "email_verification")

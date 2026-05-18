@@ -2,7 +2,7 @@ package com.jobnest.backend.modules.notification.application;
 
 import com.jobnest.backend.modules.notification.api.dto.NotificationResponse;
 import com.jobnest.backend.modules.applications.domain.Application;
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.jobs.domain.Job;
 
 import org.springframework.data.domain.Page;

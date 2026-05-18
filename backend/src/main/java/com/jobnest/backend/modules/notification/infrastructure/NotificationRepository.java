@@ -1,6 +1,6 @@
 package com.jobnest.backend.modules.notification.infrastructure;
 
-import com.jobnest.backend.shared.domain.Account;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.notification.domain.Notification;
 
 import org.springframework.data.domain.Page;
