@@ -6,28 +6,24 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface ApplicationService {
-    
-    // Apply for a job
+
     ApplicationResponse applyForJob(Long jobId, Long candidateId, ApplicationRequest request);
-    
-    // Check if candidate already applied
+
     boolean hasApplied(Long jobId, Long candidateId);
-    
-    // Get all applications for a job (employer view)
-    Page<ApplicationResponse> getJobApplications(Long jobId, Pageable pageable);
-    
-    // Get all applications by a candidate
+
+    String getCandidateApplicationStatusForJob(Long jobId, Long candidateId);
+
+    Page<ApplicationResponse> getJobApplications(Long jobId, Long employerId, Pageable pageable);
+
     Page<ApplicationResponse> getCandidateApplications(Long candidateId, Pageable pageable);
-    
-    // Get application details
-    ApplicationResponse getApplicationById(Long applicationId);
-    
-    // Update application status (employer action)
-    ApplicationResponse updateApplicationStatus(Long applicationId, String status, String notes);
-    
-    // Withdraw application (candidate action)
+
+    ApplicationResponse getApplicationByIdForCandidate(Long applicationId, Long candidateId);
+
+    ApplicationResponse getApplicationByIdForEmployer(Long applicationId, Long employerId);
+
+    ApplicationResponse updateApplicationStatus(Long applicationId, Long employerId, String status, String notes);
+
     void withdrawApplication(Long applicationId, Long candidateId);
-    
-    // Count applications for a job
-    long countApplications(Long jobId);
+
+    long countApplications(Long jobId, Long employerId);
 }

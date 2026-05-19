@@ -36,7 +36,7 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
         Account account = accountService.register(req);
         return ResponseEntity.ok(Map.of(
-                "message", "Registration successful.",
+                "message", "Registration successful. Please verify your email before logging in.",
                 "email", account.getEmail(),
                 "role", account.getRole().name(),
                 "status", account.getStatus().name()
@@ -45,8 +45,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest req) {
-        AuthResponse response = accountService.login(req);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(accountService.login(req));
     }
 
     @PostMapping("/logout")
@@ -103,14 +102,13 @@ public class AuthController {
 
     @PostMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestBody Map<String, String> body) {
-        String token = body.get("token");
-        accountService.verifyEmail(token);
+        accountService.verifyEmail(body.get("token"));
         return ResponseEntity.ok(Map.of("message", "Email verified successfully"));
     }
 
     @PostMapping("/resend-verification")
-    public ResponseEntity<?> resendVerification(@AuthenticationPrincipal CustomUserDetails user) {
-        accountService.sendEmailVerification(user.getAccount().getId());
+    public ResponseEntity<?> resendVerification(@RequestBody Map<String, String> body) {
+        accountService.sendEmailVerificationByEmail(body.get("email"));
         return ResponseEntity.ok(Map.of("message", "Verification email sent"));
     }
 
@@ -119,20 +117,7 @@ public class AuthController {
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("message", "Not logged in"));
         }
-
-        Account account = user.getAccount();
-
-        AccountDTO dto = new AccountDTO();
-        dto.setId(account.getId());
-        dto.setUsername(account.getUsername());
-        dto.setEmail(account.getEmail());
-        dto.setRole(account.getRole().name());
-        dto.setAvatarUrl(account.getAvatarUrl());
-        dto.setStatus(account.getStatus().name());
-        dto.setLastLoginAt(account.getLastLoginAt());
-        dto.setCreatedAt(account.getCreatedAt());
-
-        return ResponseEntity.ok(dto);
+        return ResponseEntity.ok(accountService.toDTO(user.getAccount()));
     }
 
     @PostMapping("/google/verify")
@@ -162,16 +147,6 @@ public class AuthController {
 
         refreshTokenService.createRefreshToken(acc, "Web Browser", "127.0.0.1");
 
-        AccountDTO accountDTO = new AccountDTO();
-        accountDTO.setId(acc.getId());
-        accountDTO.setUsername(acc.getUsername());
-        accountDTO.setEmail(acc.getEmail());
-        accountDTO.setRole(acc.getRole().name());
-        accountDTO.setAvatarUrl(acc.getAvatarUrl());
-        accountDTO.setStatus(acc.getStatus().name());
-        accountDTO.setLastLoginAt(acc.getLastLoginAt());
-        accountDTO.setCreatedAt(acc.getCreatedAt());
-
-        return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken, accountDTO));
+        return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken, accountService.toDTO(acc)));
     }
 }

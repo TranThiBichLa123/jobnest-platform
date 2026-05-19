@@ -13,18 +13,35 @@ import com.jobnest.backend.modules.auth.domain.PasswordResetToken;
 import com.jobnest.backend.modules.auth.infrastructure.EmailVerificationRepository;
 import com.jobnest.backend.modules.auth.infrastructure.PasswordResetTokenRepository;
 import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
+import com.jobnest.backend.shared.exception.BadRequestException;
+import com.jobnest.backend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AccountServiceImpl implements AccountService {
+
+    private static final long MAX_AVATAR_SIZE = 2 * 1024 * 1024;
+    private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif"
+    );
 
     private final UserRepository userRepository;
     private final EmailVerificationRepository emailVerificationRepository;
@@ -41,42 +58,45 @@ public class AccountServiceImpl implements AccountService {
         String username = req.getUsername() != null ? req.getUsername().trim() : null;
 
         if (email == null || email.isBlank()) {
-            throw new RuntimeException("Email is required");
+            throw new BadRequestException("Email is required");
         }
 
         if (username == null || username.isBlank()) {
-            throw new RuntimeException("Username is required");
+            throw new BadRequestException("Username is required");
         }
 
         if (req.getPassword() == null || req.getPassword().isBlank()) {
-            throw new RuntimeException("Password is required");
+            throw new BadRequestException("Password is required");
         }
 
         if (userRepository.existsByEmail(email)) {
-            throw new RuntimeException("Email already in use");
+            throw new BadRequestException("Email already in use");
         }
 
         if (userRepository.existsByUsername(username)) {
-            throw new RuntimeException("Username already in use");
+            throw new BadRequestException("Username already in use");
         }
 
         Account.Role role = resolveSelfRegistrationRole(req.getRole());
 
-        Account acc = new Account();
-        acc.setUsername(username);
-        acc.setEmail(email);
-        acc.setPasswordHash(passwordEncoder.encode(req.getPassword()));
-        acc.setRole(role);
+        Account account = new Account();
+        account.setUsername(username);
+        account.setEmail(email);
+        account.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+        account.setRole(role);
+        account.setStatus(Account.AccountStatus.PENDING);
+
+        Account saved = userRepository.save(account);
 
         /*
-         * Demo mode:
-         * Accounts are activated immediately to keep the recruitment demo stable.
-         * Email verification endpoints are still available but registration does not
-         * depend on SMTP availability.
+         * Security + Availability:
+         * - Account requires email verification before login.
+         * - Email sending failure must not rollback registration.
+         * - EmailService already logs fallback verification link if SMTP fails.
          */
-        acc.setStatus(Account.AccountStatus.ACTIVE);
+        sendEmailVerification(saved.getId());
 
-        return userRepository.save(acc);
+        return saved;
     }
 
     @Override
@@ -84,20 +104,21 @@ public class AccountServiceImpl implements AccountService {
         String email = normalizeEmail(req.getEmail());
 
         Account account = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+                .orElseThrow(() -> new BadRequestException("Invalid email or password"));
 
         if (!passwordEncoder.matches(req.getPassword(), account.getPasswordHash())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new BadRequestException("Invalid email or password");
+        }
+
+        if (account.getStatus() == Account.AccountStatus.PENDING) {
+            throw new BadRequestException("Please verify your email before logging in");
         }
 
         if (account.getStatus() == Account.AccountStatus.BLOCKED
                 || account.getStatus() == Account.AccountStatus.SUSPENDED
-                || account.getStatus() == Account.AccountStatus.BANNED) {
-            throw new RuntimeException("Account is not allowed to login. Please contact support.");
-        }
-
-        if (account.getStatus() == Account.AccountStatus.PENDING) {
-            throw new RuntimeException("Account is pending verification.");
+                || account.getStatus() == Account.AccountStatus.BANNED
+                || account.getStatus() == Account.AccountStatus.INACTIVE) {
+            throw new BadRequestException("Account is not allowed to login. Please contact support.");
         }
 
         account.setLastLoginAt(LocalDateTime.now());
@@ -116,7 +137,7 @@ public class AccountServiceImpl implements AccountService {
 
         refreshTokenService.createRefreshToken(account, "Web Browser", "127.0.0.1");
 
-        return new AuthResponse(accessToken, refreshToken, mapToDTO(account));
+        return new AuthResponse(accessToken, refreshToken, toDTO(account));
     }
 
     @Override
@@ -126,28 +147,28 @@ public class AccountServiceImpl implements AccountService {
 
         return userRepository.findByEmail(normalizedEmail)
                 .orElseGet(() -> {
-                    Account acc = new Account();
-                    acc.setEmail(normalizedEmail);
-                    acc.setUsername(normalizedEmail.split("@")[0] + "_" + UUID.randomUUID().toString().substring(0, 6));
-                    acc.setFullName(name);
-                    acc.setAvatarUrl(picture);
-                    acc.setRole(resolveSelfRegistrationRole(role));
-                    acc.setStatus(Account.AccountStatus.ACTIVE);
-                    acc.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
-                    return userRepository.save(acc);
+                    Account account = new Account();
+                    account.setEmail(normalizedEmail);
+                    account.setUsername(normalizedEmail.split("@")[0] + "_" + UUID.randomUUID().toString().substring(0, 6));
+                    account.setFullName(name);
+                    account.setAvatarUrl(picture);
+                    account.setRole(resolveSelfRegistrationRole(role));
+                    account.setStatus(Account.AccountStatus.ACTIVE);
+                    account.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+                    return userRepository.save(account);
                 });
     }
 
     @Override
     public Account findByEmail(String email) {
         return userRepository.findByEmail(normalizeEmail(email))
-                .orElseThrow(() -> new RuntimeException("Account not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
     }
 
     @Override
     public Account findById(Long id) {
         return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Account not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
     }
 
     @Override
@@ -159,7 +180,7 @@ public class AccountServiceImpl implements AccountService {
             String newUsername = updates.getUsername().trim();
 
             if (!newUsername.equals(account.getUsername()) && userRepository.existsByUsername(newUsername)) {
-                throw new RuntimeException("Username already in use");
+                throw new BadRequestException("Username already in use");
             }
 
             account.setUsername(newUsername);
@@ -179,11 +200,50 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional
+    public AccountDTO uploadAvatar(Long accountId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Avatar file is required");
+        }
+
+        if (file.getSize() > MAX_AVATAR_SIZE) {
+            throw new BadRequestException("Avatar file must be less than 2MB");
+        }
+
+        String contentType = file.getContentType();
+
+        if (contentType == null || !ALLOWED_AVATAR_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new BadRequestException("Only JPG, PNG, WEBP, and GIF images are allowed");
+        }
+
+        Account account = findById(accountId);
+
+        String extension = resolveImageExtension(contentType);
+        String fileName = "avatar_" + accountId + "_" + UUID.randomUUID() + extension;
+
+        try {
+            Path uploadDir = Path.of("/app/uploads/avatars");
+            Files.createDirectories(uploadDir);
+
+            Path targetPath = uploadDir.resolve(fileName).normalize();
+            file.transferTo(targetPath.toFile());
+
+            account.setAvatarUrl("/uploads/avatars/" + fileName);
+            account.setUpdatedBy(accountId);
+
+            Account saved = userRepository.save(account);
+            return toDTO(saved);
+        } catch (IOException ex) {
+            throw new BadRequestException("Could not upload avatar");
+        }
+    }
+
+    @Override
+    @Transactional
     public void changePassword(Long accountId, ChangePasswordRequest req) {
         Account account = findById(accountId);
 
         if (!passwordEncoder.matches(req.getOldPassword(), account.getPasswordHash())) {
-            throw new RuntimeException("Old password is incorrect");
+            throw new BadRequestException("Old password is incorrect");
         }
 
         account.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
@@ -202,7 +262,6 @@ public class AccountServiceImpl implements AccountService {
         resetToken.setExpiresAt(LocalDateTime.now().plusHours(1));
 
         passwordResetTokenRepository.save(resetToken);
-
         emailService.sendPasswordResetEmail(account.getEmail(), resetToken.getToken());
     }
 
@@ -211,10 +270,10 @@ public class AccountServiceImpl implements AccountService {
     public void resetPassword(ResetPasswordRequest req) {
         PasswordResetToken resetToken = passwordResetTokenRepository
                 .findByTokenAndIsUsedFalse(req.getToken())
-                .orElseThrow(() -> new RuntimeException("Invalid or expired reset token"));
+                .orElseThrow(() -> new BadRequestException("Invalid or expired reset token"));
 
         if (resetToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Reset token has expired");
+            throw new BadRequestException("Reset token has expired");
         }
 
         Account account = resetToken.getAccount();
@@ -230,26 +289,53 @@ public class AccountServiceImpl implements AccountService {
     public void sendEmailVerification(Long accountId) {
         Account account = findById(accountId);
 
+        if (account.getStatus() == Account.AccountStatus.ACTIVE) {
+            throw new BadRequestException("Account is already verified");
+        }
+
+        emailVerificationRepository.findByAccountIdAndIsUsedFalse(accountId)
+                .ifPresent(existing -> {
+                    existing.setIsUsed(true);
+                    existing.setUpdatedBy(accountId);
+                    emailVerificationRepository.save(existing);
+                });
+
         EmailVerification verification = new EmailVerification();
         verification.setAccount(account);
         verification.setToken(UUID.randomUUID().toString());
         verification.setExpiresAt(LocalDateTime.now().plusHours(24));
         verification.setCreatedBy(accountId);
 
-        emailVerificationRepository.save(verification);
+        EmailVerification saved = emailVerificationRepository.save(verification);
 
-        emailService.sendVerificationEmail(account.getEmail(), verification.getToken());
+        emailService.sendVerificationEmail(account.getEmail(), saved.getToken());
+    }
+
+    @Override
+    @Transactional
+    public void sendEmailVerificationByEmail(String email) {
+        Account account = findByEmail(email);
+
+        if (account.getStatus() == Account.AccountStatus.ACTIVE) {
+            throw new BadRequestException("Account is already verified");
+        }
+
+        sendEmailVerification(account.getId());
     }
 
     @Override
     @Transactional
     public void verifyEmail(String token) {
+        if (token == null || token.isBlank()) {
+            throw new BadRequestException("Verification token is required");
+        }
+
         EmailVerification verification = emailVerificationRepository
                 .findByTokenAndIsUsedFalse(token)
-                .orElseThrow(() -> new RuntimeException("Invalid or expired verification token"));
+                .orElseThrow(() -> new BadRequestException("Invalid or expired verification token"));
 
         if (verification.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Verification token has expired");
+            throw new BadRequestException("Verification token has expired");
         }
 
         Account account = verification.getAccount();
@@ -257,23 +343,59 @@ public class AccountServiceImpl implements AccountService {
         userRepository.save(account);
 
         verification.setIsUsed(true);
+        verification.setUpdatedBy(account.getId());
         emailVerificationRepository.save(verification);
     }
 
     @Override
-    @Transactional
-    public void blockAccount(Long accountId) {
-        Account account = findById(accountId);
-        account.setStatus(Account.AccountStatus.BLOCKED);
-        userRepository.save(account);
+    public Page<AccountDTO> getAllAccounts(Pageable pageable) {
+        return userRepository.findAll(pageable).map(this::toDTO);
     }
 
     @Override
     @Transactional
-    public void unblockAccount(Long accountId) {
-        Account account = findById(accountId);
-        account.setStatus(Account.AccountStatus.ACTIVE);
-        userRepository.save(account);
+    public void blockAccount(Long adminId, Long targetAccountId) {
+        if (adminId.equals(targetAccountId)) {
+            throw new BadRequestException("Admin cannot block their own account");
+        }
+
+        Account target = findById(targetAccountId);
+
+        if (target.getRole() == Account.Role.ADMIN) {
+            throw new BadRequestException("Admin accounts cannot be blocked through this endpoint");
+        }
+
+        target.setStatus(Account.AccountStatus.BLOCKED);
+        target.setUpdatedBy(adminId);
+        userRepository.save(target);
+    }
+
+    @Override
+    @Transactional
+    public void unblockAccount(Long adminId, Long targetAccountId) {
+        Account target = findById(targetAccountId);
+
+        if (target.getRole() == Account.Role.ADMIN) {
+            throw new BadRequestException("Admin accounts cannot be modified through this endpoint");
+        }
+
+        target.setStatus(Account.AccountStatus.ACTIVE);
+        target.setUpdatedBy(adminId);
+        userRepository.save(target);
+    }
+
+    @Override
+    public AccountDTO toDTO(Account account) {
+        AccountDTO dto = new AccountDTO();
+        dto.setId(account.getId());
+        dto.setUsername(account.getUsername());
+        dto.setEmail(account.getEmail());
+        dto.setRole(account.getRole().name());
+        dto.setAvatarUrl(account.getAvatarUrl());
+        dto.setStatus(account.getStatus().name());
+        dto.setLastLoginAt(account.getLastLoginAt());
+        dto.setCreatedAt(account.getCreatedAt());
+        return dto;
     }
 
     private Account.Role resolveSelfRegistrationRole(String role) {
@@ -291,27 +413,20 @@ public class AccountServiceImpl implements AccountService {
             return Account.Role.EMPLOYER;
         }
 
-        /*
-         * Admin accounts must not be created through public registration.
-         * Create demo admin manually through DB seed or a protected admin endpoint.
-         */
-        throw new RuntimeException("Only CANDIDATE and EMPLOYER roles are allowed for self-registration");
+        throw new BadRequestException("Only CANDIDATE and EMPLOYER roles are allowed for self-registration");
     }
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 
-    private AccountDTO mapToDTO(Account account) {
-        AccountDTO dto = new AccountDTO();
-        dto.setId(account.getId());
-        dto.setUsername(account.getUsername());
-        dto.setEmail(account.getEmail());
-        dto.setRole(account.getRole().name());
-        dto.setAvatarUrl(account.getAvatarUrl());
-        dto.setStatus(account.getStatus().name());
-        dto.setLastLoginAt(account.getLastLoginAt());
-        dto.setCreatedAt(account.getCreatedAt());
-        return dto;
+    private String resolveImageExtension(String contentType) {
+        return switch (contentType.toLowerCase(Locale.ROOT)) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            default -> throw new BadRequestException("Unsupported image type");
+        };
     }
 }
