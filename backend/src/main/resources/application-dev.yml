@@ -19,8 +19,8 @@ spring:
   mail:
     host: ${SMTP_HOST:smtp.gmail.com}
     port: ${SMTP_PORT:587}
-    username: ${SMTP_USERNAME}
-    password: ${SMTP_PASSWORD}
+    username: ${SMTP_USERNAME:demo@example.com}
+    password: ${SMTP_PASSWORD:demo-password}
     properties:
       mail:
         smtp:
@@ -47,3 +47,9 @@ springdoc:
     enabled: true
     operationsSorter: alpha
     tagsSorter: alpha
+
+logging:
+  level:
+    root: INFO
+    com.jobnest.backend: DEBUG
+    org.hibernate.SQL: DEBUG

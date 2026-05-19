@@ -1,22 +1,25 @@
 package com.jobnest.backend.modules.auth.api;
 
-import com.jobnest.backend.modules.auth.api.dto.request.*;
-import com.jobnest.backend.modules.auth.api.dto.response.*;
-import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.integration.google.GoogleService;
+import com.jobnest.backend.modules.auth.api.dto.request.ChangePasswordRequest;
+import com.jobnest.backend.modules.auth.api.dto.request.ForgotPasswordRequest;
+import com.jobnest.backend.modules.auth.api.dto.request.LoginRequest;
+import com.jobnest.backend.modules.auth.api.dto.request.RegisterRequest;
+import com.jobnest.backend.modules.auth.api.dto.request.ResetPasswordRequest;
+import com.jobnest.backend.modules.auth.api.dto.response.AccountDTO;
+import com.jobnest.backend.modules.auth.api.dto.response.AuthResponse;
 import com.jobnest.backend.modules.auth.application.AccountService;
 import com.jobnest.backend.modules.auth.application.JwtService;
 import com.jobnest.backend.modules.auth.application.RefreshTokenService;
+import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.shared.security.user.CustomUserDetails;
-
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-
-import java.util.Map;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -33,8 +36,10 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
         Account account = accountService.register(req);
         return ResponseEntity.ok(Map.of(
-            "message", "Registration successful! Please check your email to verify your account.",
-            "email", account.getEmail()
+                "message", "Registration successful.",
+                "email", account.getEmail(),
+                "role", account.getRole().name(),
+                "status", account.getStatus().name()
         ));
     }
 
@@ -56,26 +61,22 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@RequestBody Map<String, String> body) {
         String refreshToken = body.get("refreshToken");
-        
+
         if (refreshToken == null || !refreshTokenService.validateRefreshToken(refreshToken)) {
             throw new RuntimeException("Invalid or expired refresh token");
         }
-        
-        // Extract user info from refresh token
+
         String email = jwtService.extractEmail(refreshToken);
         Long userId = jwtService.extractUserId(refreshToken);
-        
-        // Get account to retrieve role
+
         Account account = accountService.findByEmail(email);
-        
-        // Generate new access token
+
         String newAccessToken = jwtService.generateAccessToken(
-            userId,
-            email,
-            account.getRole().name()
+                userId,
+                email,
+                account.getRole().name()
         );
-        
-        // Return response with existing refresh token
+
         return ResponseEntity.ok(new AuthResponse(newAccessToken, refreshToken, null));
     }
 
@@ -93,8 +94,8 @@ public class AuthController {
 
     @PostMapping("/password/change")
     public ResponseEntity<?> changePassword(
-        @AuthenticationPrincipal CustomUserDetails user,
-        @RequestBody ChangePasswordRequest req
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestBody ChangePasswordRequest req
     ) {
         accountService.changePassword(user.getAccount().getId(), req);
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
@@ -116,16 +117,29 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<?> getMe(@AuthenticationPrincipal CustomUserDetails user) {
         if (user == null) {
-            return ResponseEntity.status(401).body("Not logged in");
+            return ResponseEntity.status(401).body(Map.of("message", "Not logged in"));
         }
-        return ResponseEntity.ok(user.getAccount());
+
+        Account account = user.getAccount();
+
+        AccountDTO dto = new AccountDTO();
+        dto.setId(account.getId());
+        dto.setUsername(account.getUsername());
+        dto.setEmail(account.getEmail());
+        dto.setRole(account.getRole().name());
+        dto.setAvatarUrl(account.getAvatarUrl());
+        dto.setStatus(account.getStatus().name());
+        dto.setLastLoginAt(account.getLastLoginAt());
+        dto.setCreatedAt(account.getCreatedAt());
+
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/google/verify")
     public ResponseEntity<AuthResponse> verifyGoogle(@RequestBody Map<String, String> body) {
         String token = body.get("credential");
-        String role = body.get("role"); // Optional: CANDIDATE or EMPLOYER
-        
+        String role = body.get("role");
+
         var payload = googleService.verify(token);
 
         String email = payload.getEmail();
@@ -134,22 +148,20 @@ public class AuthController {
         String googleId = payload.getSubject();
 
         Account acc = accountService.registerWithGoogle(email, name, picture, googleId, role);
-        
-        // Generate JWT tokens for the Google user
+
         String accessToken = jwtService.generateAccessToken(
-            acc.getId(),
-            acc.getEmail(),
-            acc.getRole().name()
+                acc.getId(),
+                acc.getEmail(),
+                acc.getRole().name()
         );
+
         String refreshToken = jwtService.generateRefreshToken(
-            acc.getId(),
-            acc.getEmail()
+                acc.getId(),
+                acc.getEmail()
         );
-        
-        // Save refresh token
+
         refreshTokenService.createRefreshToken(acc, "Web Browser", "127.0.0.1");
-        
-        // Create AccountDTO using existing account data
+
         AccountDTO accountDTO = new AccountDTO();
         accountDTO.setId(acc.getId());
         accountDTO.setUsername(acc.getUsername());
@@ -159,7 +171,7 @@ public class AuthController {
         accountDTO.setStatus(acc.getStatus().name());
         accountDTO.setLastLoginAt(acc.getLastLoginAt());
         accountDTO.setCreatedAt(acc.getCreatedAt());
-        
+
         return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken, accountDTO));
     }
 }
