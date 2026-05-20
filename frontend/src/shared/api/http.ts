@@ -34,14 +34,34 @@ export const tokenStorage = {
   },
 };
 
-export function getApiErrorMessage(error: unknown, fallback = "Request failed") {
+export function getApiErrorMessage(
+  error: unknown,
+  fallback = "Something went wrong. Please try again."
+) {
   const err = error as AxiosError<any>;
-  return (
+
+  const backendMessage =
     err.response?.data?.message ||
     err.response?.data?.error ||
-    err.message ||
-    fallback
-  );
+    err.message;
+
+  if (!backendMessage) {
+    return fallback;
+  }
+
+  const normalized = backendMessage.toLowerCase();
+
+  // Không leak internal/backend message ra UI
+  if (
+    normalized.includes("unexpected error") ||
+    normalized.includes("internal server error") ||
+    normalized.includes("nullpointer") ||
+    normalized.includes("stacktrace")
+  ) {
+    return fallback;
+  }
+
+  return backendMessage;
 }
 
 api.interceptors.request.use(

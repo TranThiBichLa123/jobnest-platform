@@ -1,16 +1,30 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect } from 'react';
-import SockJS from 'sockjs-client';
-import { Client } from '@stomp/stompjs';
+import { useEffect } from "react";
+import SockJS from "sockjs-client";
+import { Client } from "@stomp/stompjs";
+import { server } from "@/config/env";
+import { tokenStorage } from "@/shared/api/http";
 
-export function useNotificationSocket(userId: string, onNotification: (msg: any) => void) {
+export function useNotificationSocket(
+  destination: string,
+  onNotification: (msg: any) => void
+) {
   useEffect(() => {
-    if (!userId) return;
-    const socket = new SockJS('http://localhost:8080/ws');
+    if (!destination) return;
+
+    const accessToken = tokenStorage.getAccessToken();
+
     const stompClient = new Client({
-      webSocketFactory: () => socket as any,
+      webSocketFactory: () => new SockJS(`${server}/ws`) as any,
+      connectHeaders: accessToken
+        ? {
+            Authorization: `Bearer ${accessToken}`,
+          }
+        : {},
+      reconnectDelay: 5000,
+      debug: () => {},
       onConnect: () => {
-        stompClient.subscribe(`/topic/notifications/${userId}`, (message) => {
+        stompClient.subscribe(destination, (message) => {
           try {
             onNotification(JSON.parse(message.body));
           } catch {
@@ -18,10 +32,14 @@ export function useNotificationSocket(userId: string, onNotification: (msg: any)
           }
         });
       },
+      onStompError: () => {},
+      onWebSocketError: () => {},
     });
+
     stompClient.activate();
+
     return () => {
       stompClient.deactivate();
     };
-  }, [userId, onNotification]);
+  }, [destination, onNotification]);
 }

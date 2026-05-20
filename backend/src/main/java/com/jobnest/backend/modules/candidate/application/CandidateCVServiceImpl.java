@@ -9,6 +9,7 @@ import com.jobnest.backend.modules.candidate.infrastructure.CandidateProfileRepo
 import com.jobnest.backend.shared.exception.BadRequestException;
 import com.jobnest.backend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,17 +18,18 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CandidateCVServiceImpl implements CandidateCVService {
 
     private static final long MAX_CV_FILE_SIZE = 5L * 1024 * 1024;
-    private static final String PDF_CONTENT_TYPE = "application/pdf";
+    private static final String PDF_EXTENSION = ".pdf";
 
     private final CandidateCVRepository cvRepository;
     private final CandidateProfileRepository candidateProfileRepository;
@@ -58,15 +60,23 @@ public class CandidateCVServiceImpl implements CandidateCVService {
         validateCandidateExists(candidateId);
         validatePdf(file);
 
+        Path savedFile = null;
+
         try {
             Path uploadDir = Path.of("uploads", "candidate-cvs").toAbsolutePath().normalize();
             Files.createDirectories(uploadDir);
 
-            String originalName = file.getOriginalFilename() == null ? "cv.pdf" : file.getOriginalFilename();
-            String safeFileName = "candidate_" + candidateId + "_" + UUID.randomUUID() + ".pdf";
+            String originalName = resolveOriginalName(file.getOriginalFilename());
+            String safeFileName = "candidate_" + candidateId + "_" + UUID.randomUUID() + PDF_EXTENSION;
+
             Path target = uploadDir.resolve(safeFileName).normalize();
 
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            if (!target.startsWith(uploadDir)) {
+                throw new BadRequestException("Invalid CV file path");
+            }
+
+            file.transferTo(target.toFile());
+            savedFile = target;
 
             CandidateCV cv = new CandidateCV();
             cv.setCandidateId(candidateId);
@@ -78,9 +88,19 @@ public class CandidateCVServiceImpl implements CandidateCVService {
 
             applyDefaultRule(candidateId, cv);
 
-            return new CandidateCVResponse(cvRepository.save(cv));
+            CandidateCV saved = cvRepository.saveAndFlush(cv);
+            return new CandidateCVResponse(saved);
+        } catch (BadRequestException ex) {
+            cleanupSavedFile(savedFile);
+            throw ex;
         } catch (IOException ex) {
-            throw new BadRequestException("Could not upload CV file");
+            cleanupSavedFile(savedFile);
+            log.error("Could not store CV file for candidateId={}", candidateId, ex);
+            throw new BadRequestException("Could not upload CV file. Please try again.", ex);
+        } catch (RuntimeException ex) {
+            cleanupSavedFile(savedFile);
+            log.error("Could not save CV metadata for candidateId={}", candidateId, ex);
+            throw new BadRequestException("Could not save CV information. Please check backend logs.", ex);
         }
     }
 
@@ -172,7 +192,7 @@ public class CandidateCVServiceImpl implements CandidateCVService {
     }
 
     private void validateCandidateExists(Long candidateId) {
-        if (!candidateProfileRepository.existsById(candidateId)) {
+        if (candidateId == null || !candidateProfileRepository.existsById(candidateId)) {
             throw new ResourceNotFoundException("Candidate profile not found");
         }
     }
@@ -200,10 +220,13 @@ public class CandidateCVServiceImpl implements CandidateCVService {
             throw new BadRequestException("CV PDF file must be <= 5MB");
         }
 
-        String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
-        String contentType = file.getContentType();
+        String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
 
-        if (!original.endsWith(".pdf") || !PDF_CONTENT_TYPE.equalsIgnoreCase(contentType)) {
+        boolean hasPdfExtension = original.endsWith(PDF_EXTENSION);
+        boolean hasPdfContentType = contentType.equals("application/pdf") || contentType.equals("application/octet-stream");
+
+        if (!hasPdfExtension || !hasPdfContentType) {
             throw new BadRequestException("Only PDF CV file is allowed");
         }
     }
@@ -236,5 +259,24 @@ public class CandidateCVServiceImpl implements CandidateCVService {
 
         String cleaned = originalName == null ? "My CV" : originalName.replace(".pdf", "").replace(".PDF", "").trim();
         return cleaned.isBlank() ? "My CV" : cleaned;
+    }
+
+    private String resolveOriginalName(String originalName) {
+        if (originalName == null || originalName.isBlank()) {
+            return "cv.pdf";
+        }
+
+        String cleaned = Path.of(originalName).getFileName().toString().trim();
+        return cleaned.isBlank() ? "cv.pdf" : cleaned;
+    }
+
+    private void cleanupSavedFile(Path path) {
+        if (path == null) return;
+
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ex) {
+            log.warn("Could not cleanup CV file {}", path, ex);
+        }
     }
 }

@@ -7,12 +7,14 @@ import com.jobnest.backend.shared.exception.BadRequestException;
 import com.jobnest.backend.shared.security.user.CustomUserDetails;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -83,6 +85,14 @@ public class CandidateCVController {
         return ResponseEntity.ok(cvService.getMyCVs(candidateId));
     }
 
+    @GetMapping("/default")
+    public ResponseEntity<CandidateCVResponse> getDefaultCV(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long candidateId = getCandidateId(userDetails);
+        return ResponseEntity.ok(cvService.getDefaultCV(candidateId));
+    }
+
     @GetMapping("/{cvId}")
     public ResponseEntity<CandidateCVResponse> getCV(
             @PathVariable Long cvId,
@@ -92,15 +102,11 @@ public class CandidateCVController {
         return ResponseEntity.ok(cvService.getCVById(cvId, candidateId));
     }
 
-    @GetMapping("/default")
-    public ResponseEntity<CandidateCVResponse> getDefaultCV(
-            @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        Long candidateId = getCandidateId(userDetails);
-        return ResponseEntity.ok(cvService.getDefaultCV(candidateId));
-    }
-
     private Long getCandidateId(CustomUserDetails userDetails) {
+        if (userDetails == null || userDetails.getAccount() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+
         Long candidateId = userDetails.getCandidateProfileId();
 
         if (candidateId == null) {
