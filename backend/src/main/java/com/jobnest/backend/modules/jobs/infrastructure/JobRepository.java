@@ -1,80 +1,135 @@
 package com.jobnest.backend.modules.jobs.infrastructure;
 
+import com.jobnest.backend.modules.jobs.domain.Job;
+import com.jobnest.backend.modules.jobs.domain.Job.JobStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
-
-import com.jobnest.backend.modules.jobs.domain.Job;
-import com.jobnest.backend.modules.jobs.domain.Job.JobStatus;
 
 import java.util.List;
 
-@Repository
 public interface JobRepository extends JpaRepository<Job, Long> {
 
-    // Candidate queries - only active jobs
-    Page<Job> findByStatus(Job.JobStatus status, Pageable pageable);
+    @EntityGraph(attributePaths = {"category"})
+    Page<Job> findByStatus(JobStatus status, Pageable pageable);
 
-    // Fetch jobs with category eagerly to avoid LazyInitializationException
-    @Query("SELECT j FROM Job j LEFT JOIN FETCH j.category WHERE j.status = :status")
-    List<Job> findByStatusWithCategory(@Param("status") Job.JobStatus status);
+    @EntityGraph(attributePaths = {"category"})
+    Page<Job> findByEmployerId(Long employerId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category"})
+    List<Job> findByEmployerId(Long employerId);
+
+    @EntityGraph(attributePaths = {"category"})
+    Page<Job> findByStatusAndEmployerId(JobStatus status, Long employerId, Pageable pageable);
 
     @Query("""
-                SELECT j
-                FROM Job j
-                LEFT JOIN FETCH j.category
-                WHERE j.employerId = :employerId
-            """)
+        SELECT j
+        FROM Job j
+        LEFT JOIN FETCH j.category
+        WHERE j.employerId = :employerId
+        ORDER BY j.postedAt DESC
+    """)
     List<Job> findByEmployerIdWithCategory(@Param("employerId") Long employerId);
 
-    @Query("SELECT j FROM Job j WHERE j.status = 'ACTIVE' AND " +
-            "(LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(j.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    @Query("""
+        SELECT j
+        FROM Job j
+        LEFT JOIN FETCH j.category
+        WHERE j.status = 'ACTIVE'
+        AND (j.expiresAt IS NULL OR j.expiresAt > CURRENT_TIMESTAMP)
+        AND (
+            LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(j.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(j.skills) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        )
+    """)
     Page<Job> searchActiveJobs(@Param("keyword") String keyword, Pageable pageable);
 
     @Query("""
-                SELECT
-                    c.id,
-                    c.name,
-                    c.slug,
-                    c.iconUrl,
-                    COUNT(j.id)
-                FROM JobCategory c
-                LEFT JOIN Job j
-                    ON c.id = j.categoryId
-                    AND j.status = :status
-                    AND (j.expiresAt IS NULL OR j.expiresAt > CURRENT_TIMESTAMP)
-                GROUP BY c.id, c.name, c.slug, c.iconUrl
-                ORDER BY c.name ASC
-            """)
-    List<Object[]> countActiveJobsByCategory(
-            @Param("status") JobStatus status);
-
-    // Employer queries - their own jobs
-    Page<Job> findByEmployerId(Long employerId, Pageable pageable);
-
-    List<Job> findByEmployerId(Long employerId);
-
-    @Query("SELECT j FROM Job j WHERE j.employerId = :employerId AND " +
-            "LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    Page<Job> searchEmployerJobs(@Param("employerId") Long employerId,
+        SELECT j
+        FROM Job j
+        LEFT JOIN FETCH j.category
+        WHERE j.status = 'ACTIVE'
+        AND (j.expiresAt IS NULL OR j.expiresAt > CURRENT_TIMESTAMP)
+        AND (:keyword IS NULL OR :keyword = ''
+            OR LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(j.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(j.skills) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        )
+        AND (:location IS NULL OR :location = ''
+            OR LOWER(j.location) LIKE LOWER(CONCAT('%', :location, '%'))
+        )
+        AND (:type IS NULL OR j.type = :type)
+        AND (:categoryId IS NULL OR j.categoryId = :categoryId)
+        AND (:minSalary IS NULL OR j.maxSalary IS NULL OR j.maxSalary >= :minSalary)
+        AND (:maxSalary IS NULL OR j.minSalary IS NULL OR j.minSalary <= :maxSalary)
+        AND (:experienceLevel IS NULL OR :experienceLevel = ''
+            OR LOWER(j.experienceLevel) = LOWER(:experienceLevel)
+        )
+    """)
+    Page<Job> searchActiveJobsAdvanced(
             @Param("keyword") String keyword,
-            Pageable pageable);
+            @Param("location") String location,
+            @Param("type") Job.JobType type,
+            @Param("categoryId") Long categoryId,
+            @Param("minSalary") Integer minSalary,
+            @Param("maxSalary") Integer maxSalary,
+            @Param("experienceLevel") String experienceLevel,
+            Pageable pageable
+    );
 
-    // Admin queries - all jobs
-    Page<Job> findAll(Pageable pageable);
+    @Query("""
+        SELECT
+            c.id,
+            c.name,
+            c.slug,
+            c.iconUrl,
+            COUNT(j.id)
+        FROM JobCategory c
+        LEFT JOIN Job j
+            ON c.id = j.categoryId
+            AND j.status = :status
+            AND (j.expiresAt IS NULL OR j.expiresAt > CURRENT_TIMESTAMP)
+        GROUP BY c.id, c.name, c.slug, c.iconUrl
+        ORDER BY c.name ASC
+    """)
+    List<Object[]> countActiveJobsByCategory(@Param("status") JobStatus status);
 
-    @Query("SELECT j FROM Job j WHERE " +
-            "LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "CAST(j.employerId AS string) LIKE CONCAT('%', :keyword, '%')")
-    Page<Job> searchAllJobs(@Param("keyword") String keyword, Pageable pageable);
+    @Query("""
+        SELECT j
+        FROM Job j
+        WHERE (:status IS NULL OR j.status = :status)
+        AND (
+            :keyword IS NULL OR :keyword = ''
+            OR LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR CAST(j.employerId AS string) LIKE CONCAT('%', :keyword, '%')
+        )
+    """)
+    Page<Job> searchJobsForAdmin(
+            @Param("status") JobStatus status,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
 
-    // Count by employer
+    @Query("""
+        SELECT j
+        FROM Job j
+        WHERE j.employerId = :employerId
+        AND (
+            :keyword IS NULL OR :keyword = ''
+            OR LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        )
+    """)
+    Page<Job> searchEmployerJobs(
+            @Param("employerId") Long employerId,
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
     long countByEmployerId(Long employerId);
 
-    // Count by status
-    long countByStatus(Job.JobStatus status);
+    long countByStatus(JobStatus status);
 }

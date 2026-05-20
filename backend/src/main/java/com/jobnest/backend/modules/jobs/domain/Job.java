@@ -1,17 +1,17 @@
 package com.jobnest.backend.modules.jobs.domain;
 
+import com.jobnest.backend.modules.auth.domain.Account;
+import com.jobnest.backend.modules.company.domain.Company;
 import jakarta.persistence.*;
 import lombok.Data;
+
 import java.time.LocalDateTime;
-
-import com.jobnest.backend.modules.company.domain.Company;
-import com.jobnest.backend.modules.auth.domain.Account;
-
 
 @Entity
 @Table(name = "jobs")
 @Data
 public class Job {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,7 +35,7 @@ public class Job {
     private String location;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private JobType type;
 
     @Column(name = "min_salary")
@@ -60,8 +60,8 @@ public class Job {
     private Boolean isUrgent = false;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private JobStatus status = JobStatus.ACTIVE;
+    @Column(nullable = false, length = 50)
+    private JobStatus status = JobStatus.PENDING_REVIEW;
 
     @Column(name = "posted_at", nullable = false, updatable = false)
     private LocalDateTime postedAt = LocalDateTime.now();
@@ -84,17 +84,23 @@ public class Job {
     @JoinColumn(name = "category_id", insertable = false, updatable = false)
     private JobCategory category;
 
-    public enum JobType {
-        FULLTIME, PARTTIME, INTERNSHIP, CONTRACT;
-
-    }
-
-    public enum JobStatus {
-        ACTIVE, HIDDEN, EXPIRED
-    }
-
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public enum JobType {
+        FULLTIME,
+        PARTTIME,
+        INTERNSHIP,
+        CONTRACT
+    }
+
+    public enum JobStatus {
+        PENDING_REVIEW,
+        ACTIVE,
+        REJECTED,
+        HIDDEN,
+        EXPIRED
     }
 }
