@@ -2,11 +2,15 @@ package com.jobnest.backend.modules.candidate.application;
 
 import com.jobnest.backend.modules.candidate.api.dto.CandidateCVRequest;
 import com.jobnest.backend.modules.candidate.api.dto.CandidateCVResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 public interface CandidateCVService {
+
     CandidateCVResponse createCV(Long candidateId, CandidateCVRequest request);
+
+    CandidateCVResponse uploadCV(Long candidateId, String title, Boolean isDefault, MultipartFile file);
 
     CandidateCVResponse updateCV(Long cvId, Long candidateId, CandidateCVRequest request);
 

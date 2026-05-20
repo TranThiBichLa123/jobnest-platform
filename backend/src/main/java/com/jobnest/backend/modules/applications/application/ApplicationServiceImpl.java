@@ -14,6 +14,7 @@ import com.jobnest.backend.modules.notification.application.NotificationService;
 import com.jobnest.backend.shared.exception.BadRequestException;
 import com.jobnest.backend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,6 +27,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ApplicationServiceImpl implements ApplicationService {
 
     private final ApplicationRepository applicationRepository;
@@ -38,6 +40,10 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Override
     @Transactional
     public ApplicationResponse applyForJob(Long jobId, Long candidateId, ApplicationRequest request) {
+        if (request == null) {
+            throw new BadRequestException("Application request is required");
+        }
+
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
@@ -71,28 +77,14 @@ public class ApplicationServiceImpl implements ApplicationService {
         application.setJob(job);
         application.setCandidate(candidate);
         application.setCvId(cv.getId());
-        application.setCoverLetter(request.getCoverLetter());
+        application.setCoverLetter(clean(request.getCoverLetter()));
         application.setResumeUrl(cv.getFileUrl());
         application.setStatus(Application.ApplicationStatus.PENDING);
         application.setAppliedAt(LocalDateTime.now());
 
         Application saved = applicationRepository.save(application);
 
-        notificationService.createNotification(
-                job.getEmployerId(),
-                "New application received",
-                "A candidate has applied for your job: " + job.getTitle(),
-                "NEW_APPLICATION",
-                saved.getId()
-        );
-
-        notificationService.createNotification(
-                candidate.getUser(),
-                "Application submitted",
-                "You have successfully applied for: " + job.getTitle(),
-                "APPLICATION_SUBMITTED",
-                saved.getId()
-        );
+        notifyApplyBestEffort(saved, job, candidate);
 
         return new ApplicationResponse(saved);
     }
@@ -178,9 +170,13 @@ public class ApplicationServiceImpl implements ApplicationService {
             throw new AccessDeniedException("You can only update applications for your own jobs");
         }
 
+        if (status == null || status.isBlank()) {
+            throw new BadRequestException("Application status is required");
+        }
+
         Application.ApplicationStatus newStatus;
         try {
-            newStatus = Application.ApplicationStatus.valueOf(status.toUpperCase());
+            newStatus = Application.ApplicationStatus.valueOf(status.trim().toUpperCase());
         } catch (Exception ex) {
             throw new BadRequestException("Invalid application status");
         }
@@ -190,20 +186,12 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         application.setStatus(newStatus);
-        application.setNotes(notes);
+        application.setNotes(clean(notes));
         application.setReviewedAt(LocalDateTime.now());
 
         Application updated = applicationRepository.save(application);
 
-        notificationService.notifyApplicationStatusChanged(
-                application.getCandidate().getUser(),
-                updated
-        );
-
-        messagingTemplate.convertAndSend(
-                "/topic/notifications/" + application.getCandidate().getId(),
-                "Your application status has been updated to: " + newStatus.name()
-        );
+        notifyStatusChangedBestEffort(updated, newStatus);
 
         return new ApplicationResponse(updated);
     }
@@ -237,5 +225,55 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         return applicationRepository.countByJobId(jobId);
+    }
+
+    private void notifyApplyBestEffort(Application saved, Job job, CandidateProfile candidate) {
+        try {
+            notificationService.createNotification(
+                    job.getEmployerId(),
+                    "New application received",
+                    "A candidate has applied for your job: " + job.getTitle(),
+                    "NEW_APPLICATION",
+                    saved.getId()
+            );
+        } catch (Exception ex) {
+            log.warn("Best-effort notification failed for employer. applicationId={}", saved.getId(), ex);
+        }
+
+        try {
+            notificationService.createNotification(
+                    candidate.getUser(),
+                    "Application submitted",
+                    "You have successfully applied for: " + job.getTitle(),
+                    "APPLICATION_SUBMITTED",
+                    saved.getId()
+            );
+        } catch (Exception ex) {
+            log.warn("Best-effort notification failed for candidate. applicationId={}", saved.getId(), ex);
+        }
+    }
+
+    private void notifyStatusChangedBestEffort(Application application, Application.ApplicationStatus newStatus) {
+        try {
+            notificationService.notifyApplicationStatusChanged(
+                    application.getCandidate().getUser(),
+                    application
+            );
+        } catch (Exception ex) {
+            log.warn("Best-effort notification failed when status changed. applicationId={}", application.getId(), ex);
+        }
+
+        try {
+            messagingTemplate.convertAndSend(
+                    "/topic/notifications/" + application.getCandidate().getId(),
+                    "Your application status has been updated to: " + newStatus.name()
+            );
+        } catch (Exception ex) {
+            log.warn("Best-effort websocket notification failed. applicationId={}", application.getId(), ex);
+        }
+    }
+
+    private String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }
