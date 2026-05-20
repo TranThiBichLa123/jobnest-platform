@@ -27,6 +27,7 @@ import com.jobnest.backend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -246,13 +247,17 @@ public class JobServiceImpl implements JobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employer not found"));
 
         if (employer.getRole() != Account.Role.EMPLOYER) {
-            throw new BadRequestException("Only employer can create job");
+            throw new AccessDeniedException("Only employer can create job");
         }
 
         validateJobRequest(request);
 
-        Company company = companyRepository.findByEmployerIdAndId(employerId, request.getCompanyId())
-                .orElseThrow(() -> new ResourceNotFoundException("Company not found or does not belong to this employer"));
+        Company company = companyRepository.findById(request.getCompanyId())
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found"));
+
+        if (!Objects.equals(company.getEmployerId(), employerId)) {
+            throw new AccessDeniedException("You can only create jobs for your own company");
+        }
 
         if (!Boolean.TRUE.equals(company.getVerified()) || company.getStatus() != Company.CompanyStatus.VERIFIED) {
             throw new BadRequestException("Company must be verified by admin before posting jobs");
@@ -279,8 +284,12 @@ public class JobServiceImpl implements JobService {
         ensureJobOwner(job, employerId);
         validateJobRequest(request);
 
-        Company company = companyRepository.findByEmployerIdAndId(employerId, request.getCompanyId())
-                .orElseThrow(() -> new ResourceNotFoundException("Company not found or does not belong to this employer"));
+        Company company = companyRepository.findById(request.getCompanyId())
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found"));
+
+        if (!Objects.equals(company.getEmployerId(), employerId)) {
+            throw new AccessDeniedException("You can only assign your own company to this job");
+        }
 
         if (!Boolean.TRUE.equals(company.getVerified()) || company.getStatus() != Company.CompanyStatus.VERIFIED) {
             throw new BadRequestException("Company must be verified by admin before posting jobs");
@@ -441,7 +450,7 @@ public class JobServiceImpl implements JobService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (user.getRole() != Account.Role.CANDIDATE) {
-            throw new BadRequestException("Only candidate can save job");
+            throw new AccessDeniedException("Only candidate can save job");
         }
 
         if (savedJobRepository.existsByIdUserIdAndIdJobId(userId, jobId)) {
@@ -552,7 +561,7 @@ public class JobServiceImpl implements JobService {
 
     private void ensureJobOwner(Job job, Long employerId) {
         if (!Objects.equals(job.getEmployerId(), employerId)) {
-            throw new BadRequestException("Not authorized to manage this job");
+            throw new AccessDeniedException("You can only manage your own jobs");
         }
     }
 

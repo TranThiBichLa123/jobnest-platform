@@ -10,6 +10,7 @@ import com.jobnest.backend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -51,20 +52,22 @@ public class CompanyServiceImpl implements CompanyService {
     @Transactional
     public CompanyResponse createCompany(Account employer, CreateCompanyRequest req) {
         if (employer.getRole() != Account.Role.EMPLOYER) {
-            throw new BadRequestException("Only employer can create company");
+            throw new AccessDeniedException("Only employer can create company");
         }
 
-        if (req.getName() == null || req.getName().isBlank()) {
+        if (req == null || req.getName() == null || req.getName().isBlank()) {
             throw new BadRequestException("Company name is required");
         }
 
-        if (companyRepository.existsByEmployerIdAndName(employer.getId(), req.getName().trim())) {
+        String companyName = req.getName().trim();
+
+        if (companyRepository.existsByEmployerIdAndName(employer.getId(), companyName)) {
             throw new BadRequestException("You already have a company with this name");
         }
 
         Company company = new Company();
         company.setEmployerId(employer.getId());
-        company.setName(req.getName().trim());
+        company.setName(companyName);
         company.setLogoUrl(req.getLogoUrl());
         company.setIndustry(req.getIndustry());
         company.setAddress(req.getAddress());
@@ -82,8 +85,12 @@ public class CompanyServiceImpl implements CompanyService {
     @Override
     @Transactional
     public CompanyResponse uploadVerificationDocument(Long employerId, Long companyId, MultipartFile file) {
-        Company company = companyRepository.findByEmployerIdAndId(employerId, companyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Company not found or does not belong to this employer"));
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found"));
+
+        if (!company.getEmployerId().equals(employerId)) {
+            throw new AccessDeniedException("You can only upload verification document for your own company");
+        }
 
         validatePdf(file);
 

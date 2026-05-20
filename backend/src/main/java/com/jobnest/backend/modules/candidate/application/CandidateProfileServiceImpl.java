@@ -1,13 +1,15 @@
 package com.jobnest.backend.modules.candidate.application;
 
+import com.jobnest.backend.modules.auth.domain.Account;
+import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
 import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileRequest;
 import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileResponse;
 import com.jobnest.backend.modules.candidate.domain.CandidateProfile;
 import com.jobnest.backend.modules.candidate.infrastructure.CandidateProfileRepository;
-import com.jobnest.backend.modules.auth.domain.Account;
-import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
-
+import com.jobnest.backend.shared.exception.BadRequestException;
+import com.jobnest.backend.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,43 +22,68 @@ public class CandidateProfileServiceImpl implements CandidateProfileService {
 
     @Override
     public CandidateProfileResponse getProfile(Long userId) {
-        CandidateProfile profile = candidateProfileRepository.findByUser_Id(userId)
-            .orElseThrow(() -> new RuntimeException("Profile not found"));
+        Account user = getCandidateAccount(userId);
+
+        CandidateProfile profile = candidateProfileRepository.findByUser_Id(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate profile not found"));
+
         return new CandidateProfileResponse(profile);
     }
 
     @Override
     @Transactional
     public CandidateProfileResponse createOrUpdateProfile(Long userId, CandidateProfileRequest request) {
-        Account user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        Account user = getCandidateAccount(userId);
+
+        if (request == null) {
+            throw new BadRequestException("Candidate profile request is required");
+        }
 
         CandidateProfile profile = candidateProfileRepository.findByUser_Id(userId)
-            .orElse(new CandidateProfile());
+                .orElse(new CandidateProfile());
 
         if (profile.getUser() == null) {
             profile.setUser(user);
         }
 
-        profile.setFullName(request.getFullName());
-        profile.setPhoneNumber(request.getPhoneNumber());
+        profile.setFullName(clean(request.getFullName()));
+        profile.setPhoneNumber(clean(request.getPhoneNumber()));
         profile.setDateOfBirth(request.getDateOfBirth());
-        
-        if (request.getGender() != null) {
-            profile.setGender(CandidateProfile.Gender.valueOf(request.getGender().toUpperCase()));
+
+        if (request.getGender() != null && !request.getGender().isBlank()) {
+            try {
+                profile.setGender(CandidateProfile.Gender.valueOf(request.getGender().trim().toUpperCase()));
+            } catch (IllegalArgumentException ex) {
+                throw new BadRequestException("Gender must be MALE, FEMALE, or OTHER");
+            }
         }
-        
-        profile.setCurrentPosition(request.getCurrentPosition());
-        profile.setYearsOfExperience(request.getYearsOfExperience());
-        
-        // Convert skills list to comma-separated string
+
+        profile.setCurrentPosition(clean(request.getCurrentPosition()));
+        profile.setYearsOfExperience(clean(request.getYearsOfExperience()));
+
         if (request.getSkills() != null && !request.getSkills().isEmpty()) {
             profile.setSkills(String.join(",", request.getSkills()));
+        } else {
+            profile.setSkills(null);
         }
-        
-        profile.setAboutMe(request.getAboutMe());
 
-        CandidateProfile savedProfile = candidateProfileRepository.save(profile);
-        return new CandidateProfileResponse(savedProfile);
+        profile.setAboutMe(clean(request.getAboutMe()));
+
+        return new CandidateProfileResponse(candidateProfileRepository.save(profile));
+    }
+
+    private Account getCandidateAccount(Long userId) {
+        Account user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found"));
+
+        if (user.getRole() != Account.Role.CANDIDATE) {
+            throw new AccessDeniedException("Only candidate accounts can manage candidate profile");
+        }
+
+        return user;
+    }
+
+    private String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

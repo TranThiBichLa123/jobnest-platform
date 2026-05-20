@@ -1,16 +1,17 @@
 package com.jobnest.backend.modules.candidate.api;
 
-import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileRequest;
-import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileResponse;
 import com.jobnest.backend.modules.auth.domain.Account;
 import com.jobnest.backend.modules.auth.infrastructure.UserRepository;
-import com.jobnest.backend.shared.security.user.CustomUserDetails;
+import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileRequest;
+import com.jobnest.backend.modules.candidate.api.dto.CandidateProfileResponse;
 import com.jobnest.backend.modules.candidate.application.CandidateProfileService;
-
+import com.jobnest.backend.shared.exception.BadRequestException;
+import com.jobnest.backend.shared.security.user.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,105 +21,111 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/candidate/profile")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('CANDIDATE')")
+@SecurityRequirement(name = "BearerAuth")
 @Tag(name = "03. Candidate Profile", description = "Candidate profile management APIs")
 public class CandidateProfileController {
 
+    private static final long MAX_AVATAR_SIZE = 2L * 1024 * 1024;
+
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/gif"
+    );
+
     private final CandidateProfileService candidateProfileService;
     private final UserRepository userRepository;
-    
-    private static final String UPLOAD_DIR = "uploads/avatars/";
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
-    @SecurityRequirement(name = "BearerAuth")
-    @Operation(summary = "Get my profile")
+    @Operation(summary = "Get my candidate profile")
     public ResponseEntity<CandidateProfileResponse> getMyProfile(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         try {
-            CandidateProfileResponse profile = candidateProfileService.getProfile(userDetails.getAccount().getId());
-            return ResponseEntity.ok(profile);
-        } catch (RuntimeException e) {
-            // Profile doesn't exist yet, return null values
+            return ResponseEntity.ok(candidateProfileService.getProfile(userDetails.getAccount().getId()));
+        } catch (RuntimeException ex) {
             return ResponseEntity.ok(new CandidateProfileResponse());
         }
     }
 
     @PutMapping
-    @PreAuthorize("isAuthenticated()")
-    @SecurityRequirement(name = "BearerAuth")
-    @Operation(summary = "Create or update my profile")
+    @Operation(summary = "Create or update my candidate profile")
     public ResponseEntity<CandidateProfileResponse> updateMyProfile(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestBody CandidateProfileRequest request
     ) {
-        CandidateProfileResponse profile = candidateProfileService.createOrUpdateProfile(
-                userDetails.getAccount().getId(), 
+        return ResponseEntity.ok(candidateProfileService.createOrUpdateProfile(
+                userDetails.getAccount().getId(),
                 request
-        );
-        return ResponseEntity.ok(profile);
+        ));
     }
 
-    @PostMapping("/avatar")
-    @PreAuthorize("isAuthenticated()")
-    @SecurityRequirement(name = "BearerAuth")
-    @Operation(summary = "Upload avatar image")
+    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload candidate avatar image")
     public ResponseEntity<Map<String, String>> uploadAvatar(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestParam("file") MultipartFile file
+            @RequestPart("file") MultipartFile file
     ) {
+        validateAvatar(file);
+
         try {
-            // Validate file
-            if (file.isEmpty()) {
-                throw new RuntimeException("Please select a file");
-            }
+            Path uploadDir = Path.of("uploads", "avatars").toAbsolutePath().normalize();
+            Files.createDirectories(uploadDir);
 
-            // Check file type
-            String contentType = file.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
-                throw new RuntimeException("Only image files are allowed");
-            }
+            String extension = resolveExtension(file.getContentType());
+            String fileName = "candidate_avatar_" + userDetails.getAccount().getId() + "_" + UUID.randomUUID() + extension;
+            Path target = uploadDir.resolve(fileName).normalize();
 
-            // Create upload directory if not exists
-            Path uploadPath = Paths.get(UPLOAD_DIR);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
-            // Generate unique filename
-            String originalFilename = file.getOriginalFilename();
-            String extension = originalFilename != null && originalFilename.contains(".") 
-                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
-                    : ".jpg";
-            String filename = UUID.randomUUID().toString() + extension;
-            
-            // Save file
-            Path filePath = uploadPath.resolve(filename);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            String avatarUrl = "/uploads/avatars/" + fileName;
 
-            // Update user's avatar URL
-            String avatarUrl = "/uploads/avatars/" + filename;
             Account account = userDetails.getAccount();
             account.setAvatarUrl(avatarUrl);
             userRepository.save(account);
 
-            // Return response
-            Map<String, String> response = new HashMap<>();
-            response.put("avatarUrl", avatarUrl);
-            response.put("message", "Avatar uploaded successfully");
-            
-            return ResponseEntity.ok(response);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to upload file: " + e.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "avatarUrl", avatarUrl,
+                    "message", "Avatar uploaded successfully"
+            ));
+        } catch (IOException ex) {
+            throw new BadRequestException("Could not upload avatar");
         }
+    }
+
+    private void validateAvatar(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Avatar file is required");
+        }
+
+        if (file.getSize() > MAX_AVATAR_SIZE) {
+            throw new BadRequestException("Avatar file must be <= 2MB");
+        }
+
+        String contentType = file.getContentType();
+
+        if (contentType == null || !ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
+            throw new BadRequestException("Only JPG, PNG, WEBP, and GIF images are allowed");
+        }
+    }
+
+    private String resolveExtension(String contentType) {
+        return switch (contentType.toLowerCase()) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            default -> throw new BadRequestException("Unsupported avatar type");
+        };
     }
 }
