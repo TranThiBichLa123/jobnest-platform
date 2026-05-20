@@ -28,11 +28,21 @@ public interface JobService {
             Pageable pageable
     );
 
+    Page<JobResponse> getActiveJobsByCategorySlug(String slug, Pageable pageable);
+
     JobResponse getJobById(Long id, Long viewerId, String viewerIp);
+
+    List<JobCategoryResponse> getAllCategories();
+
+    JobCategoryResponse getCategoryById(Long id);
 
     List<JobCategoryResponse> getCategoryStats();
 
     JobCategoryResponse createCategory(JobCategoryRequest request);
+
+    JobCategoryResponse updateCategory(Long id, JobCategoryRequest request);
+
+    void deleteCategory(Long id);
 
     JobResponse createJob(Long employerId, JobRequest request);
 

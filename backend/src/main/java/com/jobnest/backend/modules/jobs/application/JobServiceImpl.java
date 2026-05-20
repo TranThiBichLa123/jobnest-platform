@@ -30,6 +30,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -91,6 +92,19 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
+    public Page<JobResponse> getActiveJobsByCategorySlug(String slug, Pageable pageable) {
+        if (slug == null || slug.isBlank()) {
+            throw new BadRequestException("Category slug is required");
+        }
+
+        jobCategoryRepository.findBySlug(slug.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+
+        return jobRepository.findActiveJobsByCategorySlug(slug.trim(), pageable)
+                .map(this::convertToResponse);
+    }
+
+    @Override
     @Transactional
     public JobResponse getJobById(Long id, Long viewerId, String viewerIp) {
         Job job = jobRepository.findById(id)
@@ -127,6 +141,22 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
+    public List<JobCategoryResponse> getAllCategories() {
+        return jobCategoryRepository.findAll()
+                .stream()
+                .map(this::convertCategoryToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public JobCategoryResponse getCategoryById(Long id) {
+        JobCategory category = jobCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Job category not found"));
+
+        return convertCategoryToResponse(category);
+    }
+
+    @Override
     public List<JobCategoryResponse> getCategoryStats() {
         return jobRepository.countActiveJobsByCategory(JobStatus.ACTIVE)
                 .stream()
@@ -139,6 +169,74 @@ public class JobServiceImpl implements JobService {
                         (Long) row[4]
                 ))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public JobCategoryResponse createCategory(JobCategoryRequest request) {
+        validateCategoryRequest(request);
+
+        String name = request.getName().trim();
+        String slug = generateSlug(name);
+
+        if (jobCategoryRepository.existsByNameIgnoreCase(name)) {
+            throw new BadRequestException("Job category already exists");
+        }
+
+        if (jobCategoryRepository.existsBySlug(slug)) {
+            throw new BadRequestException("Job category slug already exists");
+        }
+
+        JobCategory category = JobCategory.builder()
+                .name(name)
+                .slug(slug)
+                .iconUrl(clean(request.getIconUrl()))
+                .description(clean(request.getDescription()))
+                .build();
+
+        return convertCategoryToResponse(jobCategoryRepository.save(category));
+    }
+
+    @Override
+    @Transactional
+    public JobCategoryResponse updateCategory(Long id, JobCategoryRequest request) {
+        validateCategoryRequest(request);
+
+        JobCategory category = jobCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Job category not found"));
+
+        String name = request.getName().trim();
+        String slug = generateSlug(name);
+
+        if (jobCategoryRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
+            throw new BadRequestException("Job category name already exists");
+        }
+
+        if (jobCategoryRepository.existsBySlugAndIdNot(slug, id)) {
+            throw new BadRequestException("Job category slug already exists");
+        }
+
+        category.setName(name);
+        category.setSlug(slug);
+        category.setIconUrl(clean(request.getIconUrl()));
+        category.setDescription(clean(request.getDescription()));
+
+        return convertCategoryToResponse(jobCategoryRepository.save(category));
+    }
+
+    @Override
+    @Transactional
+    public void deleteCategory(Long id) {
+        JobCategory category = jobCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Job category not found"));
+
+        long usedJobs = jobRepository.countByCategoryId(id);
+
+        if (usedJobs > 0) {
+            throw new BadRequestException("Cannot delete category because it is used by existing jobs");
+        }
+
+        jobCategoryRepository.delete(category);
     }
 
     @Override
@@ -380,43 +478,6 @@ public class JobServiceImpl implements JobService {
                 .collect(Collectors.toList());
     }
 
-    @Override
-    @Transactional
-    public JobCategoryResponse createCategory(JobCategoryRequest request) {
-        if (request == null || request.getName() == null || request.getName().isBlank()) {
-            throw new BadRequestException("Category name is required");
-        }
-
-        if (jobCategoryRepository.existsByNameIgnoreCase(request.getName().trim())) {
-            throw new BadRequestException("Job category already exists");
-        }
-
-        String slug = request.getName()
-                .toLowerCase()
-                .trim()
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("(^-|-$)", "");
-
-        if (jobCategoryRepository.existsBySlug(slug)) {
-            throw new BadRequestException("Job category slug already exists");
-        }
-
-        JobCategory category = JobCategory.builder()
-                .name(request.getName().trim())
-                .slug(slug)
-                .description(request.getDescription())
-                .build();
-
-        JobCategory savedCategory = jobCategoryRepository.save(category);
-
-        return JobCategoryResponse.builder()
-                .id(savedCategory.getId())
-                .name(savedCategory.getName())
-                .slug(savedCategory.getSlug())
-                .description(savedCategory.getDescription())
-                .build();
-    }
-
     private void applyRequestToJob(Job job, JobRequest request) {
         job.setCompanyId(request.getCompanyId());
         job.setTitle(request.getTitle().trim());
@@ -465,6 +526,16 @@ public class JobServiceImpl implements JobService {
         validateSalaryRange(request.getMinSalary(), request.getMaxSalary());
     }
 
+    private void validateCategoryRequest(JobCategoryRequest request) {
+        if (request == null) {
+            throw new BadRequestException("Category request is required");
+        }
+
+        if (request.getName() == null || request.getName().isBlank()) {
+            throw new BadRequestException("Category name is required");
+        }
+    }
+
     private void validateSalaryRange(Integer minSalary, Integer maxSalary) {
         if (minSalary != null && minSalary < 0) {
             throw new BadRequestException("Minimum salary must be >= 0");
@@ -493,6 +564,18 @@ public class JobServiceImpl implements JobService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    private String generateSlug(String input) {
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+
+        return normalized
+                .toLowerCase()
+                .trim()
+                .replaceAll("đ", "d")
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-|-$)", "");
+    }
+
     private JobResponse convertToResponse(Job job) {
         JobResponse response = new JobResponse(job);
 
@@ -508,6 +591,16 @@ public class JobServiceImpl implements JobService {
         }
 
         return response;
+    }
+
+    private JobCategoryResponse convertCategoryToResponse(JobCategory category) {
+        return JobCategoryResponse.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .slug(category.getSlug())
+                .iconUrl(category.getIconUrl())
+                .description(category.getDescription())
+                .build();
     }
 
     private void logAdminAction(

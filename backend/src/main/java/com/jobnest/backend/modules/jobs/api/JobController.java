@@ -87,6 +87,32 @@ public class JobController {
         return ResponseEntity.ok(jobService.getJobById(id, viewerId, viewerIp));
     }
 
+    @GetMapping("/categories")
+    public ResponseEntity<List<JobCategoryResponse>> getAllCategories() {
+        return ResponseEntity.ok(jobService.getAllCategories());
+    }
+
+    @GetMapping("/categories/stats")
+    public ResponseEntity<List<JobCategoryResponse>> getCategoryStats() {
+        return ResponseEntity.ok(jobService.getCategoryStats());
+    }
+
+    @GetMapping("/categories/{slug}/jobs")
+    public ResponseEntity<Page<JobResponse>> getActiveJobsByCategorySlug(
+            @PathVariable String slug,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "postedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir
+    ) {
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return ResponseEntity.ok(jobService.getActiveJobsByCategorySlug(slug, pageable));
+    }
+
     @PostMapping("/{id}/save")
     @PreAuthorize("hasRole('CANDIDATE')")
     @SecurityRequirement(name = "BearerAuth")
@@ -116,10 +142,5 @@ public class JobController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         return ResponseEntity.ok(jobService.getSavedJobs(userDetails.getAccount().getId()));
-    }
-
-    @GetMapping("/categories/stats")
-    public ResponseEntity<List<JobCategoryResponse>> getCategoryStats() {
-        return ResponseEntity.ok(jobService.getCategoryStats());
     }
 }

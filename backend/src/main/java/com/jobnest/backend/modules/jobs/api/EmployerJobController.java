@@ -2,6 +2,7 @@ package com.jobnest.backend.modules.jobs.api;
 
 import com.jobnest.backend.modules.jobs.api.dto.request.ExtendJobRequest;
 import com.jobnest.backend.modules.jobs.api.dto.request.JobRequest;
+import com.jobnest.backend.modules.jobs.api.dto.response.JobCategoryResponse;
 import com.jobnest.backend.modules.jobs.api.dto.response.JobResponse;
 import com.jobnest.backend.modules.jobs.application.JobService;
 import com.jobnest.backend.shared.security.user.CustomUserDetails;
@@ -25,6 +26,12 @@ import java.util.List;
 public class EmployerJobController {
 
     private final JobService jobService;
+
+    @GetMapping("/job-categories")
+    @PreAuthorize("hasRole('EMPLOYER')")
+    public ResponseEntity<List<JobCategoryResponse>> getCategoriesForPosting() {
+        return ResponseEntity.ok(jobService.getAllCategories());
+    }
 
     @PostMapping("/jobs")
     @PreAuthorize("hasRole('EMPLOYER')")
