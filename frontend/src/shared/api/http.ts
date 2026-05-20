@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import axios from "axios";
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { API_URL } from "@/config/env";
 
 const api = axios.create({
@@ -7,33 +7,68 @@ const api = axios.create({
   withCredentials: true,
 });
 
-/**
- * ✅ REQUEST INTERCEPTOR – LUÔN GẮN TOKEN
- */
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("accessToken");
-      if (token) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+export const tokenStorage = {
+  getAccessToken: () =>
+    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null,
+
+  getRefreshToken: () =>
+    typeof window !== "undefined" ? localStorage.getItem("refreshToken") : null,
+
+  setTokens: (accessToken: string, refreshToken?: string) => {
+    if (typeof window === "undefined") return;
+
+    localStorage.setItem("accessToken", accessToken);
+    if (refreshToken) {
+      localStorage.setItem("refreshToken", refreshToken);
     }
+
+    api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  },
+
+  clearTokens: () => {
+    if (typeof window === "undefined") return;
+
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    delete api.defaults.headers.common.Authorization;
+  },
+};
+
+export function getApiErrorMessage(error: unknown, fallback = "Request failed") {
+  const err = error as AxiosError<any>;
+  return (
+    err.response?.data?.message ||
+    err.response?.data?.error ||
+    err.message ||
+    fallback
+  );
+}
+
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = tokenStorage.getAccessToken();
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for automatic token refresh
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
 
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
+const processQueue = (error: unknown, token?: string) => {
+  failedQueue.forEach((promise) => {
+    if (error || !token) {
+      promise.reject(error);
     } else {
-      prom.resolve(token);
+      promise.resolve(token);
     }
   });
 
@@ -42,54 +77,70 @@ const processQueue = (error: any, token: string | null = null) => {
 
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError<any>) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & {
+      _retry?: boolean;
+    };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers["Authorization"] = "Bearer " + token;
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
+    const status = error.response?.status;
+    const url = originalRequest?.url || "";
 
-      originalRequest._retry = true;
-      isRefreshing = true;
+    const shouldTryRefresh =
+      status === 401 &&
+      !originalRequest?._retry &&
+      !url.includes("/auth/login") &&
+      !url.includes("/auth/register") &&
+      !url.includes("/auth/refresh");
 
-      const refreshToken = localStorage.getItem("refreshToken");
-
-      if (!refreshToken) {
-        isRefreshing = false;
-        return Promise.reject(error);
-      }
-
-      try {
-        const response = await api.post("/auth/refresh", { refreshToken });
-        const { accessToken, refreshToken: newRefreshToken } = response.data;
-
-        localStorage.setItem("accessToken", accessToken);
-        localStorage.setItem("refreshToken", newRefreshToken);
-        api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
-
-        processQueue(null, accessToken);
-
-        originalRequest.headers["Authorization"] = `Bearer ${accessToken}`;
-        return api(originalRequest);
-      } catch (err) {
-        processQueue(err, null);
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
+    if (!shouldTryRefresh) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    if (isRefreshing) {
+      return new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      }).then((token) => {
+        originalRequest.headers.Authorization = `Bearer ${token}`;
+        return api(originalRequest);
+      });
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    const refreshToken = tokenStorage.getRefreshToken();
+
+    if (!refreshToken) {
+      tokenStorage.clearTokens();
+      isRefreshing = false;
+      return Promise.reject(error);
+    }
+
+    try {
+      const response = await axios.post(`${API_URL}/auth/refresh`, {
+        refreshToken,
+      });
+
+      const newAccessToken = response.data.accessToken;
+      const newRefreshToken = response.data.refreshToken || refreshToken;
+
+      tokenStorage.setTokens(newAccessToken, newRefreshToken);
+      processQueue(null, newAccessToken);
+
+      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      processQueue(refreshError);
+      tokenStorage.clearTokens();
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("jobnest:auth-expired"));
+      }
+
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   }
 );
 
