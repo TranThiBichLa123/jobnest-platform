@@ -35,7 +35,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AccountServiceImpl implements AccountService {
 
-    private static final long MAX_AVATAR_SIZE = 2 * 1024 * 1024;
+    private static final long MAX_AVATAR_SIZE = 2L * 1024 * 1024;
+
     private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -89,10 +90,14 @@ public class AccountServiceImpl implements AccountService {
         Account saved = userRepository.save(account);
 
         /*
-         * Security + Availability:
-         * - Account requires email verification before login.
-         * - Email sending failure must not rollback registration.
-         * - EmailService already logs fallback verification link if SMTP fails.
+         * Security:
+         * - Self-registration only allows CANDIDATE / EMPLOYER.
+         * - ADMIN cannot be registered publicly.
+         * - New accounts must verify email before login.
+         *
+         * Availability:
+         * - EmailService must handle SMTP failure internally.
+         * - Registration should not be rolled back just because email sending fails.
          */
         sendEmailVerification(saved.getId());
 
@@ -221,7 +226,7 @@ public class AccountServiceImpl implements AccountService {
         String fileName = "avatar_" + accountId + "_" + UUID.randomUUID() + extension;
 
         try {
-            Path uploadDir = Path.of("/app/uploads/avatars");
+            Path uploadDir = Path.of("uploads", "avatars").toAbsolutePath().normalize();
             Files.createDirectories(uploadDir);
 
             Path targetPath = uploadDir.resolve(fileName).normalize();
@@ -308,7 +313,15 @@ public class AccountServiceImpl implements AccountService {
 
         EmailVerification saved = emailVerificationRepository.save(verification);
 
-        emailService.sendVerificationEmail(account.getEmail(), saved.getToken());
+        try {
+            emailService.sendVerificationEmail(account.getEmail(), saved.getToken());
+        } catch (Exception ex) {
+            System.out.println("=====================================");
+            System.out.println("EMAIL VERIFICATION SEND FAILED");
+            System.out.println("Use this token for local demo:");
+            System.out.println(saved.getToken());
+            System.out.println("=====================================");
+        }
     }
 
     @Override
