@@ -156,6 +156,32 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
     @Override
+    public ApplicationResponse getApplicationByIdForAdmin(Long applicationId) {
+        Application application = applicationRepository.findWithDetailsById(applicationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+
+        return new ApplicationResponse(application);
+    }
+
+    @Override
+    public Page<ApplicationResponse> getApplicationsForAdmin(String status, Pageable pageable) {
+        if (status == null || status.isBlank()) {
+            return applicationRepository.findAll(pageable).map(ApplicationResponse::new);
+        }
+
+        Application.ApplicationStatus parsedStatus;
+
+        try {
+            parsedStatus = Application.ApplicationStatus.valueOf(status.trim().toUpperCase());
+        } catch (Exception ex) {
+            throw new BadRequestException("Invalid application status");
+        }
+
+        return applicationRepository.findByStatus(parsedStatus, pageable)
+                .map(ApplicationResponse::new);
+    }
+
+    @Override
     @Transactional
     public ApplicationResponse updateApplicationStatus(
             Long applicationId,
@@ -174,12 +200,7 @@ public class ApplicationServiceImpl implements ApplicationService {
             throw new BadRequestException("Application status is required");
         }
 
-        Application.ApplicationStatus newStatus;
-        try {
-            newStatus = Application.ApplicationStatus.valueOf(status.trim().toUpperCase());
-        } catch (Exception ex) {
-            throw new BadRequestException("Invalid application status");
-        }
+        Application.ApplicationStatus newStatus = parseStatus(status);
 
         if (application.getStatus() == Application.ApplicationStatus.WITHDRAWN) {
             throw new BadRequestException("Withdrawn applications cannot be updated");
@@ -225,6 +246,14 @@ public class ApplicationServiceImpl implements ApplicationService {
         }
 
         return applicationRepository.countByJobId(jobId);
+    }
+
+    private Application.ApplicationStatus parseStatus(String status) {
+        try {
+            return Application.ApplicationStatus.valueOf(status.trim().toUpperCase());
+        } catch (Exception ex) {
+            throw new BadRequestException("Invalid application status");
+        }
     }
 
     private void notifyApplyBestEffort(Application saved, Job job, CandidateProfile candidate) {

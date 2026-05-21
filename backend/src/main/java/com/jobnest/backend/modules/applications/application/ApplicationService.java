@@ -21,6 +21,10 @@ public interface ApplicationService {
 
     ApplicationResponse getApplicationByIdForEmployer(Long applicationId, Long employerId);
 
+    ApplicationResponse getApplicationByIdForAdmin(Long applicationId);
+
+    Page<ApplicationResponse> getApplicationsForAdmin(String status, Pageable pageable);
+
     ApplicationResponse updateApplicationStatus(Long applicationId, Long employerId, String status, String notes);
 
     void withdrawApplication(Long applicationId, Long candidateId);

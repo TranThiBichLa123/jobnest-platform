@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "02. Admin Users", description = "Admin user management APIs")
 public class AdminUserController {
 
@@ -46,7 +48,7 @@ public class AdminUserController {
     }
 
     @PostMapping("/{id}/block")
-    public ResponseEntity<?> blockUser(
+    public ResponseEntity<Map<String, String>> blockUser(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails admin
     ) {
@@ -55,7 +57,7 @@ public class AdminUserController {
     }
 
     @PostMapping("/{id}/unblock")
-    public ResponseEntity<?> unblockUser(
+    public ResponseEntity<Map<String, String>> unblockUser(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails admin
     ) {
