@@ -152,6 +152,27 @@ public class ApplicationController {
         return ResponseEntity.ok(Map.of("count", count));
     }
 
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin views all applications")
+    public ResponseEntity<Page<ApplicationResponse>> getApplicationsForAdmin(
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("appliedAt").descending());
+        return ResponseEntity.ok(applicationService.getApplicationsForAdmin(status, pageable));
+    }
+
+    @GetMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Admin views application details")
+    public ResponseEntity<ApplicationResponse> getApplicationDetailsForAdmin(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(applicationService.getApplicationByIdForAdmin(id));
+    }
+
     private Long requireCandidateProfile(CustomUserDetails userDetails) {
         Long candidateId = userDetails.getCandidateProfileId();
 

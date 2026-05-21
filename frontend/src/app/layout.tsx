@@ -2,25 +2,16 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
 
-import ResponsiveNav from "@/shared/components/Navbar/ResponsiveNav";
 import Provider from "@/shared/components/Hoc/Provider";
-import Footer from "@/features/home/components/Footer/Footer";
-import ScrollToTop from "@/shared/components/Helper/ScrollToTop";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import AuthProvider from "@/features/auth/context/AuthContext";
 import { AuthModalProvider } from "@/features/auth/context/AuthModalContext";
-import { Network } from 'lucide-react';
-
-const App = () => {
-  return (
-    <Network />
-  );
-};
+import AppChrome from "@/shared/components/AppChrome";
 
 const font = Roboto({
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
-  subsets: ['latin']
-})
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "JobNest",
@@ -30,31 +21,26 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning={true} className={`${font.className} antialiased`}>
-
-        {/* BỌC TOÀN BỘ APP TRONG Google Provider */}
-        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}>
-
-          {/* Bên trong là AuthProvider + UI */}
+      <body suppressHydrationWarning className={`${font.className} antialiased`}>
+        <GoogleOAuthProvider
+          clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+        >
           <AuthProvider>
             <AuthModalProvider>
               <Provider>
-                <ResponsiveNav />
-                {children}
-                <Footer />
-                <ScrollToTop />
+                <AppChrome>{children}</AppChrome>
               </Provider>
             </AuthModalProvider>
           </AuthProvider>
         </GoogleOAuthProvider>
-
       </body>
     </html>
   );
 }
-
-
