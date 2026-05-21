@@ -1,10 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import { useState, useContext } from "react";
+import { useRouter } from "next/navigation";
 import { AuthContext } from "@/features/auth/context/AuthContext";
 import GoogleRegisterButton from "@/shared/components/Auth/GoogleRegisterButton";
+import { dashboardPathByRole } from "@/shared/security/navigation";
+import { normalizeRole } from "@/shared/security/access-control";
 
 export default function LoginModal({
   show,
@@ -18,20 +20,28 @@ export default function LoginModal({
   onOpenRegister: () => void;
 }) {
   const auth = useContext(AuthContext);
+  const router = useRouter();
+
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
 
-  // Email validation function
-  const isValidEmail = (email: string): boolean => {
+  const isValidEmail = (emailValue: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return emailRegex.test(emailValue);
+  };
+
+  const redirectAfterLogin = (role?: string | null) => {
+    const normalizedRole = normalizeRole(role);
+    router.push(dashboardPathByRole[normalizedRole]);
   };
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
+
     if (value && !isValidEmail(value)) {
       setEmailError("Please enter a valid email address");
     } else {
@@ -40,6 +50,8 @@ export default function LoginModal({
   };
 
   async function handleLogin() {
+    setError("");
+
     if (!email || !password) {
       setError("Please fill in all fields");
       return;
@@ -51,8 +63,11 @@ export default function LoginModal({
     }
 
     try {
-      await auth?.login({ email, password });
+      const loggedInUser = await auth?.login({ email, password });
+
       onClose();
+
+      redirectAfterLogin(loggedInUser?.role);
     } catch (err: any) {
       setError(err.response?.data?.message || "Login failed");
     }
@@ -66,18 +81,19 @@ export default function LoginModal({
       onClick={onClose}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
         className="bg-white dark:bg-gray-800 w-[600px] max-w-[95%] rounded-xl shadow-xl p-8 relative"
       >
-        {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 text-2xl hover:text-black"
+          className="absolute top-4 right-4 text-gray-500 text-2xl hover:text-black dark:hover:text-white"
         >
           ✕
         </button>
 
-        <h2 className="text-2xl font-semibold mb-6 dark:text-white">Login to continue</h2>
+        <h2 className="text-2xl font-semibold mb-6 dark:text-white">
+          Login to continue
+        </h2>
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -85,35 +101,37 @@ export default function LoginModal({
           </div>
         )}
 
-        {/* Google */}
         <div className="mb-6">
           <GoogleRegisterButton
             fullWidth={true}
             onSuccess={(data) => {
-              console.log("Google login successful:", data);
               onClose();
+              redirectAfterLogin(data?.account?.role);
             }}
           />
         </div>
 
-        <div className="text-center text-gray-500 dark:text-gray-400 my-3">or login by email</div>
+        <div className="text-center text-gray-500 dark:text-gray-400 my-3">
+          or login by email
+        </div>
 
-        {/* Form */}
         <div className="space-y-5">
           <div>
             <label className="font-medium dark:text-white">
               Email <span className="text-red-500">*</span>
             </label>
+
             <input
               type="email"
               value={email}
-              onChange={(e) => handleEmailChange(e.target.value)}
+              onChange={(event) => handleEmailChange(event.target.value)}
               className={`w-full border rounded-lg px-4 py-2 mt-1 outline-none ${
                 emailError
                   ? "border-red-500 focus:border-red-500"
                   : "dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-cyan-500"
               }`}
             />
+
             {emailError && (
               <p className="text-red-500 text-sm mt-1">{emailError}</p>
             )}
@@ -128,8 +146,12 @@ export default function LoginModal({
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleLogin();
+                  }
+                }}
                 className="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 outline-none focus:border-cyan-500 pr-10"
               />
 
@@ -146,7 +168,6 @@ export default function LoginModal({
               </button>
             </div>
 
-            {/* Forgot password */}
             <div
               className="text-right mt-1 text-cyan-600 dark:text-cyan-400 text-sm cursor-pointer hover:underline"
               onClick={() => {
@@ -159,7 +180,6 @@ export default function LoginModal({
           </div>
         </div>
 
-        {/* Buttons */}
         <div className="mt-8 flex justify-end gap-3">
           <button
             onClick={onClose}
@@ -168,7 +188,7 @@ export default function LoginModal({
             Cancel
           </button>
 
-          <button 
+          <button
             onClick={handleLogin}
             className="px-6 py-2 bg-cyan-700 text-white rounded-lg hover:bg-cyan-800"
           >
@@ -176,7 +196,7 @@ export default function LoginModal({
           </button>
         </div>
 
-        <div className="mt-6 text-center text-sm">
+        <div className="mt-6 text-center text-sm dark:text-gray-300">
           Don't have an account yet?
           <span
             className="text-blue-600 cursor-pointer ml-1"
@@ -192,5 +212,3 @@ export default function LoginModal({
     </div>
   );
 }
-
-

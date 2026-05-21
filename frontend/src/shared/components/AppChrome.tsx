@@ -5,7 +5,11 @@ import ResponsiveNav from "@/shared/components/Navbar/ResponsiveNav";
 import Footer from "@/features/home/components/Footer/Footer";
 import ScrollToTop from "@/shared/components/Helper/ScrollToTop";
 
-export default function AppChrome({ children }: { children: React.ReactNode }) {
+export default function AppChrome({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith("/admin");
 
@@ -16,7 +20,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   return (
     <>
       <ResponsiveNav />
-      {children}
+      <main>{children}</main>
       <Footer />
       <ScrollToTop />
     </>

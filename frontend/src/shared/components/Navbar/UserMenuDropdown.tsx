@@ -50,12 +50,11 @@ export default function UserMenuDropdown({
   }, []);
 
   const handleLogout = async () => {
+    setOpen(false);
+
     if (auth?.logout) {
       await auth.logout();
     }
-
-    setOpen(false);
-    router.push("/");
   };
 
   return (
@@ -81,6 +80,7 @@ export default function UserMenuDropdown({
             <p className="font-semibold text-gray-900 dark:text-white truncate">
               {username || "User"}
             </p>
+
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {role}
             </p>

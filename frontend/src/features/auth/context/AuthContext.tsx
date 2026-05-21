@@ -19,7 +19,7 @@ import {
 
 interface AuthContextType {
   user: User | null;
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (credentials: LoginRequest) => Promise<User>;
   logout: () => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   refreshToken: () => Promise<void>;
@@ -85,7 +85,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  async function login(credentials: LoginRequest) {
+  async function login(credentials: LoginRequest): Promise<User> {
     const response = await api.post<AuthResponse>("/auth/login", credentials);
     const { accessToken, refreshToken, account } = response.data;
 
@@ -93,25 +93,36 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(accessToken);
 
     if (account) {
-      setUser(account);
-    } else {
-      await reloadUser();
+      const normalized = normalizeUser(account);
+      setUserState(normalized);
+      return normalized;
     }
+
+    const meResponse = await api.get<User>("/auth/me");
+    const normalized = normalizeUser(meResponse.data);
+    setUserState(normalized);
+    return normalized;
   }
 
   async function logout() {
-    const refreshToken = tokenStorage.getRefreshToken();
+    const currentRefreshToken = tokenStorage.getRefreshToken();
 
     try {
-      if (refreshToken) {
-        await api.post("/auth/logout", { refreshToken });
+      if (currentRefreshToken) {
+        await api.post("/auth/logout", {
+          refreshToken: currentRefreshToken,
+        });
       }
     } catch {
-      // Logout phía client vẫn phải chạy kể cả backend từ chối token cũ.
+      // Client-side logout still has to continue even if backend rejects an old token.
     } finally {
       tokenStorage.clearTokens();
       setAccessToken(null);
       setUser(null);
+
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
     }
   }
 

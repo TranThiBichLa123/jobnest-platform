@@ -1,8 +1,12 @@
 "use client";
 
 import { useContext } from "react";
-import { BiBell, BiCalendar } from "react-icons/bi";
+import {
+  BiCalendar,
+  BiLogOut,
+} from "react-icons/bi";
 import { AuthContext } from "@/features/auth/context/AuthContext";
+import AdminThemeToggle from "@/features/admin/components/AdminThemeToggle";
 
 type Props = {
   title: string;
@@ -12,12 +16,19 @@ type Props = {
 export default function AdminTopbar({ title, description }: Props) {
   const auth = useContext(AuthContext);
 
+  const handleLogout = async () => {
+    if (auth?.logout) {
+      await auth.logout();
+    }
+  };
+
   return (
     <header className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
         <h1 className="text-3xl md:text-4xl font-extrabold text-gray-950 dark:text-white">
           {title}
         </h1>
+
         <p className="mt-1 text-gray-500 dark:text-gray-400">{description}</p>
       </div>
 
@@ -27,9 +38,7 @@ export default function AdminTopbar({ title, description }: Props) {
           Today
         </div>
 
-        <button className="h-12 w-12 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-center text-gray-700 dark:text-gray-200 shadow-sm">
-          <BiBell className="text-2xl" />
-        </button>
+        <AdminThemeToggle />
 
         <div className="flex items-center gap-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2 shadow-sm">
           <div className="h-10 w-10 rounded-xl bg-cyan-700 text-white flex items-center justify-center font-extrabold">
@@ -45,6 +54,16 @@ export default function AdminTopbar({ title, description }: Props) {
             </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="h-12 px-4 rounded-2xl border border-red-100 dark:border-red-900/60 bg-white dark:bg-gray-900 flex items-center justify-center gap-2 text-red-600 dark:text-red-400 font-bold shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          title="Logout"
+        >
+          <BiLogOut className="text-2xl" />
+          <span className="hidden md:inline">Logout</span>
+        </button>
       </div>
     </header>
   );
