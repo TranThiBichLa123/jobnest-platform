@@ -18,6 +18,8 @@ public interface CompanyService {
 
     Page<CompanyResponse> getMyCompanies(Long employerId, Pageable pageable);
 
+    CompanyResponse uploadCompanyLogo(Long employerId, Long companyId, MultipartFile file);
+
     CompanyResponse uploadVerificationDocument(Long employerId, Long companyId, MultipartFile file);
 
     Page<CompanyResponse> getCompaniesForAdmin(Company.CompanyStatus status, Pageable pageable);

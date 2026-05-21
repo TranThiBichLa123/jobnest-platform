@@ -1,6 +1,6 @@
 import api from "@/shared/api/http";
-import { Company, CreateCompanyRequest } from "@/shared/types/employer";
 import { PageResponse } from "@/features/jobs/api";
+import { Company, CreateCompanyRequest } from "@/shared/types/employer";
 
 export const companyApi = {
   getTopCompanies: async (): Promise<Company[]> => {
@@ -24,6 +24,17 @@ export const companyApi = {
     return response.data;
   },
 
+  uploadCompanyLogo: async (companyId: number, file: File): Promise<Company> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await api.post(`/companies/${companyId}/logo`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    return response.data;
+  },
+
   uploadVerificationDocument: async (
     companyId: number,
     file: File
@@ -35,9 +46,7 @@ export const companyApi = {
       `/companies/${companyId}/verification-document`,
       formData,
       {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       }
     );
 

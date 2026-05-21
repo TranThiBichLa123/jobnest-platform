@@ -1,4 +1,11 @@
-import { BiBuilding, BiCheckCircle, BiMap, BiTime, BiXCircle } from "react-icons/bi";
+import {
+  BiBuilding,
+  BiCheckCircle,
+  BiMap,
+  BiTime,
+  BiXCircle,
+} from "react-icons/bi";
+import { server } from "@/config/env";
 import { Company, isCompanyVerified } from "@/shared/types/employer";
 
 type Props = {
@@ -28,22 +35,42 @@ function getStatusIcon(status: string) {
   return <BiTime />;
 }
 
+function getCompanyLogoUrl(logoUrl?: string) {
+  if (!logoUrl || logoUrl.trim() === "") {
+    return "/images/default-company.jpg";
+  }
+
+  if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+    return logoUrl;
+  }
+
+  if (logoUrl.startsWith("/uploads")) {
+    return `${server}${logoUrl}`;
+  }
+
+  if (logoUrl.startsWith("/")) {
+    return logoUrl;
+  }
+
+  return logoUrl;
+}
+
 export default function EmployerCompanyCard({ company }: Props) {
   const status = getStatus(company);
+  const logoSrc = getCompanyLogoUrl(company.logoUrl);
 
   return (
     <article className="rounded-3xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 shadow-sm">
       <div className="flex items-start gap-4">
-        <div className="h-14 w-14 rounded-2xl bg-cyan-50 dark:bg-cyan-900/30 flex items-center justify-center shrink-0">
-          {company.logoUrl ? (
-            <img
-              src={company.logoUrl}
-              alt={company.name}
-              className="h-full w-full object-cover rounded-2xl"
-            />
-          ) : (
-            <BiBuilding className="text-2xl text-cyan-700 dark:text-cyan-300" />
-          )}
+        <div className="h-16 w-16 rounded-2xl bg-cyan-50 dark:bg-cyan-900/30 flex items-center justify-center shrink-0 overflow-hidden border border-cyan-100 dark:border-cyan-800">
+          <img
+            src={logoSrc}
+            alt={`${company.name} logo`}
+            className="h-full w-full object-cover"
+            onError={(event) => {
+              event.currentTarget.src = "/images/default-company.jpg";
+            }}
+          />
         </div>
 
         <div className="min-w-0 flex-1">

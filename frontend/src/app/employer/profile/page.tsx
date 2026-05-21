@@ -74,23 +74,31 @@ export default function EmployerProfilePage() {
 
     const handleCreateCompany = async (
         data: CreateCompanyRequest,
-        verificationFile: File
+        verificationFile: File,
+        logoFile?: File
     ) => {
         setCreating(true);
         setMessage(null);
 
         try {
             const created = await companyApi.createCompany(data);
-            const verifiedPending = await companyApi.uploadVerificationDocument(
+
+            let updatedCompany = created;
+
+            if (logoFile) {
+                updatedCompany = await companyApi.uploadCompanyLogo(created.id, logoFile);
+            }
+
+            updatedCompany = await companyApi.uploadVerificationDocument(
                 created.id,
                 verificationFile
             );
 
-            setCompanies((prev) => [verifiedPending, ...prev]);
+            setCompanies((prev) => [updatedCompany, ...prev]);
 
             setMessage({
                 type: "success",
-                text: "Company profile created and verification PDF uploaded. Please wait for Admin approval before posting jobs.",
+                text: "Company profile created, logo uploaded, and verification PDF submitted. Please wait for Admin approval before posting jobs.",
             });
         } catch (error) {
             setMessage({
@@ -130,10 +138,10 @@ export default function EmployerProfilePage() {
                 {message && (
                     <div
                         className={`mb-6 rounded-2xl border p-4 text-sm ${message.type === "success"
-                                ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
-                                : message.type === "info"
-                                    ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                                    : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+                            ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                            : message.type === "info"
+                                ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                                : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
                             }`}
                     >
                         {message.text}

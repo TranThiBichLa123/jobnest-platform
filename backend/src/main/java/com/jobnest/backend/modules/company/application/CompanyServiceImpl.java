@@ -30,6 +30,7 @@ public class CompanyServiceImpl implements CompanyService {
 
     private static final long MAX_VERIFICATION_FILE_SIZE = 5L * 1024 * 1024;
     private static final String PDF_CONTENT_TYPE = "application/pdf";
+    private static final long MAX_LOGO_FILE_SIZE = 2L * 1024 * 1024;
 
     private final CompanyRepository companyRepository;
 
@@ -76,6 +77,37 @@ public class CompanyServiceImpl implements CompanyService {
 
         return new CompanyResponse(companyRepository.save(company));
     }
+
+    @Override
+@Transactional
+public CompanyResponse uploadCompanyLogo(Long employerId, Long companyId, MultipartFile file) {
+    Company company = companyRepository.findById(companyId)
+            .orElseThrow(() -> new ResourceNotFoundException("Company not found"));
+
+    if (!company.getEmployerId().equals(employerId)) {
+        throw new AccessDeniedException("You can only upload logo for your own company");
+    }
+
+    validateImage(file);
+
+    try {
+        Path uploadDir = Path.of("uploads", "company-logos").toAbsolutePath().normalize();
+        Files.createDirectories(uploadDir);
+
+        String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        String extension = original.endsWith(".png") ? ".png" : ".jpg";
+        String safeName = "company_" + companyId + "_" + UUID.randomUUID() + extension;
+
+        Path target = uploadDir.resolve(safeName).normalize();
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+        company.setLogoUrl("/uploads/company-logos/" + safeName);
+
+        return new CompanyResponse(companyRepository.save(company));
+    } catch (IOException ex) {
+        throw new BadRequestException("Could not upload company logo");
+    }
+}
 
     @Override
     public Page<CompanyResponse> getMyCompanies(Long employerId, Pageable pageable) {
@@ -175,4 +207,30 @@ public class CompanyServiceImpl implements CompanyService {
             throw new BadRequestException("Only PDF verification document is allowed");
         }
     }
+
+    private void validateImage(MultipartFile file) {
+    if (file == null || file.isEmpty()) {
+        throw new BadRequestException("Company logo is required");
+    }
+
+    if (file.getSize() > MAX_LOGO_FILE_SIZE) {
+        throw new BadRequestException("Company logo must be <= 2MB");
+    }
+
+    String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+    String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+
+    boolean validExtension =
+            original.endsWith(".jpg") ||
+            original.endsWith(".jpeg") ||
+            original.endsWith(".png");
+
+    boolean validContentType =
+            contentType.equals("image/jpeg") ||
+            contentType.equals("image/png");
+
+    if (!validExtension || !validContentType) {
+        throw new BadRequestException("Only JPG, JPEG, and PNG images are allowed");
+    }
+}
 }

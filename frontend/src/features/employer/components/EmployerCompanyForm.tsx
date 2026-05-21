@@ -1,27 +1,33 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { BiFile, BiUpload, BiX } from "react-icons/bi";
+import { BiFile, BiImageAdd, BiUpload, BiX } from "react-icons/bi";
 import { CreateCompanyRequest } from "@/shared/types/employer";
 
 type Props = {
   loading: boolean;
-  onSubmit: (data: CreateCompanyRequest, verificationFile: File) => Promise<void>;
+  onSubmit: (
+    data: CreateCompanyRequest,
+    verificationFile: File,
+    logoFile?: File
+  ) => Promise<void>;
 };
 
 const inputClass =
   "w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-600";
 
 export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const documentInputRef = useRef<HTMLInputElement | null>(null);
 
   const [form, setForm] = useState<CreateCompanyRequest>({
     name: "",
     industry: "",
     address: "",
-    logoUrl: "",
   });
 
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
   const [verificationFile, setVerificationFile] = useState<File | null>(null);
   const [error, setError] = useState("");
 
@@ -33,7 +39,32 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
     setError("");
   };
 
-  const handleFileChange = (file?: File) => {
+  const handleLogoChange = (file?: File) => {
+    setError("");
+
+    if (!file) {
+      setLogoFile(null);
+      setLogoPreview("");
+      return;
+    }
+
+    const validTypes = ["image/png", "image/jpeg", "image/jpg"];
+
+    if (!validTypes.includes(file.type)) {
+      setError("Company logo must be JPG or PNG.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Company logo must be <= 2MB.");
+      return;
+    }
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleDocumentChange = (file?: File) => {
     setError("");
 
     if (!file) {
@@ -43,17 +74,30 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
 
     if (file.type !== "application/pdf" || !file.name.toLowerCase().endsWith(".pdf")) {
       setError("Only PDF verification document is allowed.");
-      setVerificationFile(null);
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       setError("Verification PDF must be <= 5MB.");
-      setVerificationFile(null);
       return;
     }
 
     setVerificationFile(file);
+  };
+
+  const resetForm = () => {
+    setForm({
+      name: "",
+      industry: "",
+      address: "",
+    });
+
+    setLogoFile(null);
+    setLogoPreview("");
+    setVerificationFile(null);
+
+    if (logoInputRef.current) logoInputRef.current.value = "";
+    if (documentInputRef.current) documentInputRef.current.value = "";
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -74,23 +118,12 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
         name: form.name.trim(),
         industry: form.industry?.trim() || undefined,
         address: form.address?.trim() || undefined,
-        logoUrl: form.logoUrl?.trim() || undefined,
       },
-      verificationFile
+      verificationFile,
+      logoFile || undefined
     );
 
-    setForm({
-      name: "",
-      industry: "",
-      address: "",
-      logoUrl: "",
-    });
-
-    setVerificationFile(null);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    resetForm();
   };
 
   return (
@@ -103,7 +136,7 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
           Create Company Profile
         </h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Upload company information and a verification PDF for Admin approval.
+          Upload company logo and verification PDF for Admin approval.
         </p>
       </div>
 
@@ -134,12 +167,55 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
         placeholder="Address"
       />
 
-      <input
-        value={form.logoUrl || ""}
-        onChange={(event) => updateField("logoUrl", event.target.value)}
-        className={inputClass}
-        placeholder="Logo URL (optional)"
-      />
+      <div>
+        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+          Company Logo
+        </label>
+
+        <input
+          ref={logoInputRef}
+          type="file"
+          accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+          className="hidden"
+          onChange={(event) => handleLogoChange(event.target.files?.[0])}
+        />
+
+        <button
+          type="button"
+          onClick={() => logoInputRef.current?.click()}
+          className="w-full rounded-2xl border-2 border-dashed border-cyan-200 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-900/10 px-4 py-5 text-cyan-800 dark:text-cyan-200 font-bold hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors flex items-center justify-center gap-2"
+        >
+          <BiImageAdd className="text-xl" />
+          Choose company logo
+        </button>
+
+        {logoPreview && (
+          <div className="mt-3 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <img
+                src={logoPreview}
+                alt="Company logo preview"
+                className="h-12 w-12 rounded-xl object-cover"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                {logoFile?.name}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setLogoFile(null);
+                setLogoPreview("");
+                if (logoInputRef.current) logoInputRef.current.value = "";
+              }}
+              className="text-red-600 hover:text-red-800"
+            >
+              <BiX className="text-xl" />
+            </button>
+          </div>
+        )}
+      </div>
 
       <div>
         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
@@ -147,16 +223,16 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
         </label>
 
         <input
-          ref={fileInputRef}
+          ref={documentInputRef}
           type="file"
           accept="application/pdf,.pdf"
           className="hidden"
-          onChange={(event) => handleFileChange(event.target.files?.[0])}
+          onChange={(event) => handleDocumentChange(event.target.files?.[0])}
         />
 
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => documentInputRef.current?.click()}
           className="w-full rounded-2xl border-2 border-dashed border-cyan-200 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-900/10 px-4 py-5 text-cyan-800 dark:text-cyan-200 font-bold hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors flex items-center justify-center gap-2"
         >
           <BiUpload className="text-xl" />
@@ -176,7 +252,7 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
               type="button"
               onClick={() => {
                 setVerificationFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
+                if (documentInputRef.current) documentInputRef.current.value = "";
               }}
               className="text-red-600 hover:text-red-800"
             >
