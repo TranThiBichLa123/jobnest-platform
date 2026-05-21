@@ -75,6 +75,24 @@ export const jobApi = {
   },
 };
 
+export const employerJobApi = {
+  getMyJobs: async (
+    page = 0,
+    size = 10
+  ): Promise<PageResponse<Job>> => {
+    const response = await api.get("/employers/me/jobs", {
+      params: {
+        page,
+        size,
+        sortBy: "postedAt",
+        sortDir: "desc",
+      },
+    });
+
+    return response.data;
+  },
+};
+
 export const savedJobApi = {
   saveJob: async (jobId: number): Promise<{ message: string }> => {
     const response = await api.post(`/saved-jobs/${jobId}`);

@@ -2,7 +2,9 @@ import api from "@/shared/api/http";
 import {
   ApplicationRequest,
   ApplicationResponse,
+  ApplicationStatus,
 } from "@/shared/types/applications";
+import { PageResponse } from "@/features/jobs/api";
 
 export const applicationApi = {
   applyForJob: async (
@@ -31,6 +33,29 @@ export const applicationApi = {
     applicationId: number
   ): Promise<{ message: string }> => {
     const response = await api.delete(`/applications/${applicationId}`);
+    return response.data;
+  },
+
+  getJobApplications: async (
+    jobId: number,
+    page = 0,
+    size = 20
+  ): Promise<PageResponse<ApplicationResponse>> => {
+    const response = await api.get(`/applications/job/${jobId}`, {
+      params: { page, size },
+    });
+
+    return response.data;
+  },
+
+  updateApplicationStatus: async (
+    applicationId: number,
+    data: {
+      status: ApplicationStatus;
+      notes?: string;
+    }
+  ): Promise<ApplicationResponse> => {
+    const response = await api.put(`/applications/${applicationId}/status`, data);
     return response.data;
   },
 };
