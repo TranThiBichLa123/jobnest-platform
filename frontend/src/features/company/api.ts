@@ -1,9 +1,26 @@
-import api from '@/shared/api/http';
+import api from "@/shared/api/http";
+import { Company, CreateCompanyRequest } from "@/shared/types/employer";
+import { PageResponse } from "@/features/jobs/api";
 
 export const companyApi = {
-  // Get top companies with active job counts
-  getTopCompanies: async () => {
-    const response = await api.get('/companies/top');
+  getTopCompanies: async (): Promise<Company[]> => {
+    const response = await api.get("/companies/top");
+    return response.data;
+  },
+
+  getMyCompanies: async (
+    page = 0,
+    size = 20
+  ): Promise<PageResponse<Company>> => {
+    const response = await api.get("/companies/my", {
+      params: { page, size },
+    });
+
+    return response.data;
+  },
+
+  createCompany: async (data: CreateCompanyRequest): Promise<Company> => {
+    const response = await api.post("/companies", data);
     return response.data;
   },
 };

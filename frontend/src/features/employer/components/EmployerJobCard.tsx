@@ -9,6 +9,7 @@ import {
 
 type Props = {
   job: Job;
+  applicationsCount?: number;
 };
 
 function getStatusClass(status?: string) {
@@ -29,7 +30,13 @@ function getStatusClass(status?: string) {
   return "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300";
 }
 
-export default function EmployerJobCard({ job }: Props) {
+function isPublicJob(status?: string) {
+  return String(status || "").toUpperCase() === "ACTIVE";
+}
+
+export default function EmployerJobCard({ job, applicationsCount = 0 }: Props) {
+  const publicJob = isPublicJob(job.status);
+
   return (
     <article className="rounded-3xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-5 shadow-sm hover:shadow-xl transition-all">
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -48,14 +55,24 @@ export default function EmployerJobCard({ job }: Props) {
                 Urgent
               </span>
             )}
+
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300">
+              {applicationsCount} applicants
+            </span>
           </div>
 
-          <Link
-            href={`/jobs/${job.id}`}
-            className="text-xl font-bold text-gray-900 dark:text-white hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors"
-          >
-            {job.title}
-          </Link>
+          {publicJob ? (
+            <Link
+              href={`/jobs/${job.id}`}
+              className="text-xl font-bold text-gray-900 dark:text-white hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors"
+            >
+              {job.title}
+            </Link>
+          ) : (
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              {job.title}
+            </h2>
+          )}
 
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
             {job.description}
@@ -79,6 +96,13 @@ export default function EmployerJobCard({ job }: Props) {
 
             <span>{formatJobType(job.type)}</span>
           </div>
+
+          {!publicJob && (
+            <div className="mt-4 rounded-2xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 p-3 text-sm text-yellow-700 dark:text-yellow-300">
+              This job is not public yet. Admin approval is required before
+              candidates can view and apply.
+            </div>
+          )}
         </div>
 
         <div className="flex lg:flex-col gap-3 shrink-0">
@@ -90,12 +114,22 @@ export default function EmployerJobCard({ job }: Props) {
             View Applicants
           </Link>
 
-          <Link
-            href={`/jobs/${job.id}`}
-            className="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            Public Detail
-          </Link>
+          {publicJob ? (
+            <Link
+              href={`/jobs/${job.id}`}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Public Detail
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-bold text-gray-400 dark:text-gray-500 cursor-not-allowed"
+            >
+              Not Public Yet
+            </button>
+          )}
         </div>
       </div>
     </article>

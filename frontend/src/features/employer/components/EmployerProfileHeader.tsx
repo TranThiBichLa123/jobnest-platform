@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { BiBriefcase, BiPlus, BiUser } from "react-icons/bi";
+import { BiBriefcase, BiBuilding, BiPlus } from "react-icons/bi";
 
-export default function EmployerJobsHeader() {
+export default function EmployerProfileHeader() {
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-800 via-slate-900 to-gray-950 p-6 md:p-8 shadow-2xl mb-8">
       <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
@@ -10,22 +10,21 @@ export default function EmployerJobsHeader() {
       <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
         <div>
           <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight">
-            Employer Dashboard
+            Employer Profile
           </h1>
 
           <p className="mt-3 text-cyan-50/80 max-w-2xl">
-            Manage company verification, job postings, and candidate
-            applications from one place.
+            Manage your employer account and company verification status.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/employer/profile"
+            href="/employer/jobs"
             className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/10 border border-white/10 text-white font-bold hover:bg-white/20 transition-colors"
           >
-            <BiUser />
-            My Profile
+            <BiBriefcase />
+            Dashboard
           </Link>
 
           <Link
@@ -37,11 +36,11 @@ export default function EmployerJobsHeader() {
           </Link>
 
           <Link
-            href="#job-list"
+            href="#companies"
             className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white text-cyan-900 font-bold hover:bg-cyan-50 transition-colors"
           >
-            <BiBriefcase />
-            Job List
+            <BiBuilding />
+            Companies
           </Link>
         </div>
       </div>
