@@ -1,5 +1,5 @@
 import api from "@/shared/api/http";
-import { Job } from "@/shared/types/job";
+import { Job, JobCategory, JobRequest } from "@/shared/types/job";
 
 export type PageResponse<T> = {
   content: T[];
@@ -64,13 +64,46 @@ export const jobApi = {
     return response.data;
   },
 
-  getCategories: async () => {
+  getCategories: async (): Promise<JobCategory[]> => {
     const response = await api.get("/jobs/categories");
     return response.data;
   },
 
   getCategoryStats: async () => {
     const response = await api.get("/jobs/categories/stats");
+    return response.data;
+  },
+};
+
+export const employerJobApi = {
+  getMyJobs: async (
+    page = 0,
+    size = 10
+  ): Promise<PageResponse<Job>> => {
+    const response = await api.get("/employers/me/jobs", {
+      params: {
+        page,
+        size,
+        sortBy: "postedAt",
+        sortDir: "desc",
+      },
+    });
+
+    return response.data;
+  },
+
+  getCategoriesForPosting: async (): Promise<JobCategory[]> => {
+    const response = await api.get("/employers/job-categories");
+    return response.data;
+  },
+
+  createJob: async (data: JobRequest): Promise<Job> => {
+    const response = await api.post("/employers/jobs", data);
+    return response.data;
+  },
+
+  updateJob: async (jobId: number, data: JobRequest): Promise<Job> => {
+    const response = await api.put(`/employers/jobs/${jobId}`, data);
     return response.data;
   },
 };

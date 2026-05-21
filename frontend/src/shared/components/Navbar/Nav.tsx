@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LuNetwork } from "react-icons/lu";
@@ -9,12 +15,18 @@ import { FiBell } from "react-icons/fi";
 import { MdAccountCircle } from "react-icons/md";
 
 import { server } from "@/config/env";
-import { NavLinks } from "@/shared/constants/constant";
 import ThemeToggler from "@/shared/components/Helper/ThemeToggler";
 import { AuthContext } from "@/features/auth/context/AuthContext";
 import { useNotificationSocket } from "@/features/notifications/hooks/useNotificationSocket";
 import { useAuthModal } from "@/features/auth/context/AuthModalContext";
 import { notificationApi } from "@/shared/api";
+import { normalizeRole } from "@/shared/security/access-control";
+import {
+  canSeeNavItem,
+  getJobPostLabel,
+  getJobPostTarget,
+  mainNavItems,
+} from "@/shared/security/navigation";
 
 import RegisterModal from "@/shared/components/Auth/RegisterModal";
 import ForgotPasswordModal from "@/shared/components/Auth/ForgotPasswordModal";
@@ -45,6 +57,7 @@ function getAvatarUrl(
   }
 
   const name = username || (email ? email.split("@")[0] : "User");
+
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(
     name
   )}&background=0e7490&color=fff&size=128&bold=true`;
@@ -53,7 +66,7 @@ function getAvatarUrl(
 const Nav = ({ openNav }: Props) => {
   const [navBg, setNavBg] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const [showPopupSmall, setShowPopup] = useState(false);
+  const [showPopupSmall, setShowPopupSmall] = useState(false);
   const [showPopupLarge, setShowPopupLarge] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -77,6 +90,11 @@ const Nav = ({ openNav }: Props) => {
   const auth = useContext(AuthContext);
   const user = auth?.user;
   const isInitializing = auth?.isInitializing;
+  const role = normalizeRole(user?.role);
+
+  const visibleNavItems = mainNavItems.filter((item) =>
+    canSeeNavItem(item, role)
+  );
 
   const handleNotification = useCallback((msg: any) => {
     const nextNotification = {
@@ -104,7 +122,9 @@ const Nav = ({ openNav }: Props) => {
 
   useEffect(() => {
     return () => {
-      if (toastTimeout.current) clearTimeout(toastTimeout.current);
+      if (toastTimeout.current) {
+        clearTimeout(toastTimeout.current);
+      }
     };
   }, []);
 
@@ -124,6 +144,7 @@ const Nav = ({ openNav }: Props) => {
   const loadNotifications = async (unreadOnly = false) => {
     try {
       const data = await notificationApi.getMyNotifications({ unreadOnly });
+
       setNotifications(Array.isArray(data) ? data : []);
       setUnreadCount(
         Array.isArray(data) ? data.filter((n: any) => !n.read).length : 0
@@ -137,32 +158,50 @@ const Nav = ({ openNav }: Props) => {
   const handleMarkAsRead = async (notificationId: number) => {
     try {
       await notificationApi.markAsRead(notificationId);
+
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+        prev.map((notification) =>
+          notification.id === notificationId
+            ? { ...notification, read: true }
+            : notification
+        )
       );
+
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {}
+    } catch {
+      // Notification is best-effort; do not break navbar UX.
+    }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
       await notificationApi.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+      setNotifications((prev) =>
+        prev.map((notification) => ({ ...notification, read: true }))
+      );
+
       setUnreadCount(0);
-    } catch {}
+    } catch {
+      // Notification is best-effort; do not break navbar UX.
+    }
   };
 
   const handleClearAll = async () => {
     try {
       await Promise.all(
         notifications
-          .filter((n: any) => n.id)
-          .map((n: any) => notificationApi.deleteNotification(n.id))
+          .filter((notification: any) => notification.id)
+          .map((notification: any) =>
+            notificationApi.deleteNotification(notification.id)
+          )
       );
 
       setNotifications([]);
       setUnreadCount(0);
-    } catch {}
+    } catch {
+      // Notification is best-effort; do not break navbar UX.
+    }
   };
 
   const handleBellClick = () => {
@@ -181,22 +220,14 @@ const Nav = ({ openNav }: Props) => {
   };
 
   const handleJobPostClick = () => {
+    if (isInitializing) return;
+
     if (!user) {
       openLoginModal();
       return;
     }
 
-    if (user.role === "EMPLOYER") {
-      router.push("/employer/jobs");
-      return;
-    }
-
-    if (user.role === "ADMIN") {
-      router.push("/admin/jobs");
-      return;
-    }
-
-    router.push("/jobs");
+    router.push(getJobPostTarget(role));
   };
 
   return (
@@ -218,15 +249,29 @@ const Nav = ({ openNav }: Props) => {
           </Link>
 
           <div className="hidden lg:flex items-center space-x-10">
-            {NavLinks.map((link) => {
-              const isActive = pathname === link.url;
+            {visibleNavItems.map((link) => {
+              const isActive = link.href !== "#" && pathname === link.href;
+
+              if (link.href === "#") {
+                return (
+                  <button
+                    key={link.id}
+                    type="button"
+                    className="text-base hover:text-cyan-700 dark:hover:text-cyan-200 font-medium transition-all duration-200 text-gray-900 dark:text-gray-100"
+                  >
+                    {link.label}
+                  </button>
+                );
+              }
 
               return (
                 <Link
                   key={link.id}
-                  href={link.url}
+                  href={link.href}
                   className={`text-base hover:text-cyan-700 dark:hover:text-cyan-200 font-medium transition-all duration-200 ${
-                    isActive ? "text-cyan-800 dark:text-white" : ""
+                    isActive
+                      ? "text-cyan-800 dark:text-white"
+                      : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   <p>{link.label}</p>
@@ -242,7 +287,7 @@ const Nav = ({ openNav }: Props) => {
               onClick={handleJobPostClick}
               className="px-8 py-2.5 text-sm text-white hidden sm:block cursor-pointer rounded-lg bg-cyan-700 hover:bg-cyan-900 transition-all duration-300"
             >
-              Job Post
+              {getJobPostLabel(role)}
             </button>
 
             {user && (
@@ -279,12 +324,16 @@ const Nav = ({ openNav }: Props) => {
 
             {user ? (
               <UserMenuDropdown
-                avatarUrl={getAvatarUrl(user.avatarUrl, user.email, user.username)}
+                avatarUrl={getAvatarUrl(
+                  user.avatarUrl,
+                  user.email,
+                  user.username
+                )}
                 username={user.username}
               />
             ) : (
               <button
-                onClick={() => setShowPopup(true)}
+                onClick={() => setShowPopupSmall(true)}
                 className="p-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-900 transition-all duration-300"
                 aria-label="Open login menu"
               >
@@ -301,7 +350,7 @@ const Nav = ({ openNav }: Props) => {
 
             <LoginPopup
               show={showPopupSmall}
-              onClose={() => setShowPopup(false)}
+              onClose={() => setShowPopupSmall(false)}
               onOpenLogin={openLoginModal}
               onOpenRegister={openRegisterModal}
             />

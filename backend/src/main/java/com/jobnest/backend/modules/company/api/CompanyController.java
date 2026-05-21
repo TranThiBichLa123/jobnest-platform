@@ -54,6 +54,16 @@ public class CompanyController {
         return ResponseEntity.ok(companyService.getMyCompanies(user.getAccount().getId(), pageable));
     }
 
+    @PostMapping(value = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('EMPLOYER')")
+    public ResponseEntity<CompanyResponse> uploadCompanyLogo(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        return ResponseEntity.ok(companyService.uploadCompanyLogo(user.getAccount().getId(), id, file));
+    }
+
     @PostMapping(value = "/{id}/verification-document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('EMPLOYER')")
     public ResponseEntity<CompanyResponse> uploadVerificationDocument(
