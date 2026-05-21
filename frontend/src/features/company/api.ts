@@ -23,4 +23,24 @@ export const companyApi = {
     const response = await api.post("/companies", data);
     return response.data;
   },
+
+  uploadVerificationDocument: async (
+    companyId: number,
+    file: File
+  ): Promise<Company> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await api.post(
+      `/companies/${companyId}/verification-document`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    return response.data;
+  },
 };

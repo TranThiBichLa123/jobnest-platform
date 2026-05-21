@@ -1,17 +1,20 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import { BiFile, BiUpload, BiX } from "react-icons/bi";
 import { CreateCompanyRequest } from "@/shared/types/employer";
 
 type Props = {
   loading: boolean;
-  onSubmit: (data: CreateCompanyRequest) => Promise<void>;
+  onSubmit: (data: CreateCompanyRequest, verificationFile: File) => Promise<void>;
 };
 
 const inputClass =
   "w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-600";
 
 export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [form, setForm] = useState<CreateCompanyRequest>({
     name: "",
     industry: "",
@@ -19,6 +22,7 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
     logoUrl: "",
   });
 
+  const [verificationFile, setVerificationFile] = useState<File | null>(null);
   const [error, setError] = useState("");
 
   const updateField = <K extends keyof CreateCompanyRequest>(
@@ -29,7 +33,30 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
     setError("");
   };
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleFileChange = (file?: File) => {
+    setError("");
+
+    if (!file) {
+      setVerificationFile(null);
+      return;
+    }
+
+    if (file.type !== "application/pdf" || !file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Only PDF verification document is allowed.");
+      setVerificationFile(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Verification PDF must be <= 5MB.");
+      setVerificationFile(null);
+      return;
+    }
+
+    setVerificationFile(file);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!form.name.trim()) {
@@ -37,12 +64,20 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
       return;
     }
 
-    await onSubmit({
-      name: form.name.trim(),
-      industry: form.industry?.trim() || undefined,
-      address: form.address?.trim() || undefined,
-      logoUrl: form.logoUrl?.trim() || undefined,
-    });
+    if (!verificationFile) {
+      setError("Verification PDF is required for Admin approval.");
+      return;
+    }
+
+    await onSubmit(
+      {
+        name: form.name.trim(),
+        industry: form.industry?.trim() || undefined,
+        address: form.address?.trim() || undefined,
+        logoUrl: form.logoUrl?.trim() || undefined,
+      },
+      verificationFile
+    );
 
     setForm({
       name: "",
@@ -50,6 +85,12 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
       address: "",
       logoUrl: "",
     });
+
+    setVerificationFile(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -62,7 +103,7 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
           Create Company Profile
         </h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Admin must verify your company before you can post jobs.
+          Upload company information and a verification PDF for Admin approval.
         </p>
       </div>
 
@@ -97,8 +138,53 @@ export default function EmployerCompanyForm({ loading, onSubmit }: Props) {
         value={form.logoUrl || ""}
         onChange={(event) => updateField("logoUrl", event.target.value)}
         className={inputClass}
-        placeholder="Logo URL"
+        placeholder="Logo URL (optional)"
       />
+
+      <div>
+        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+          Verification Document PDF
+        </label>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          onChange={(event) => handleFileChange(event.target.files?.[0])}
+        />
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full rounded-2xl border-2 border-dashed border-cyan-200 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-900/10 px-4 py-5 text-cyan-800 dark:text-cyan-200 font-bold hover:bg-cyan-50 dark:hover:bg-cyan-900/20 transition-colors flex items-center justify-center gap-2"
+        >
+          <BiUpload className="text-xl" />
+          Choose verification PDF
+        </button>
+
+        {verificationFile && (
+          <div className="mt-3 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <BiFile className="text-cyan-700 dark:text-cyan-300 shrink-0" />
+              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                {verificationFile.name}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setVerificationFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="text-red-600 hover:text-red-800"
+            >
+              <BiX className="text-xl" />
+            </button>
+          </div>
+        )}
+      </div>
 
       <button
         type="submit"
